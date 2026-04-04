@@ -247,6 +247,7 @@
           <thead>
             <tr>
               <th onclick="sortBy('channel')" data-col="channel">Channel <span class="sort-icon">↕</span></th>
+              <th onclick="sortBy('sourceWh')" data-col="sourceWh">Source/WH <span class="sort-icon">↕</span></th>
               <th onclick="sortBy('poNo')" data-col="poNo">PO No <span class="sort-icon">↕</span></th>
               <th onclick="sortBy('poDate')" data-col="poDate">PO Date <span class="sort-icon">↕</span></th>
               <th onclick="sortBy('location')" data-col="location">Location/WH <span class="sort-icon">↕</span></th>
@@ -292,7 +293,7 @@ const OAUTH_CLIENT_ID = "463035787922-tpie873ujm0b03cousnoan1np4t7jhvs.apps.goog
 // Column name mapping — maps your actual sheet headers to internal keys
 // Left side = your sheet header (case-insensitive), Right = internal key
 const COL_MAP = {
-  "source":           "channel",
+  "source":           "sourceWh",
   "po no":            "poNo",
   "po number":        "poNo",
   "portal":           "portal",
@@ -493,7 +494,13 @@ async function fetchSheet(sheet) {
     if (!obj.fillRate && obj.poQty && obj.invQty) {
       const pq = parseFloat(obj.poQty), iq = parseFloat(obj.invQty);
       if (pq > 0) obj.fillRate = ((iq / pq) * 100).toFixed(1) + "%";
-    }obj.channel = sheet.name;
+    }
+    obj.poDate         = normaliseDate(obj.poDate);
+    obj.dispatchedDate = normaliseDate(obj.dispatchedDate);
+    obj.expiryDate     = normaliseDate(obj.expiryDate);
+    obj.deliveryDate   = normaliseDate(obj.deliveryDate);
+    obj.apptDate       = normaliseDate(obj.apptDate);
+    obj.channel = sheet.name;
     return obj;
   }).filter(r => r.poNo || r.channel);
 }
@@ -530,7 +537,7 @@ function applyFilters() {
     if (dateFrom && r.poDate && r.poDate < dateFrom) return false;
     if (dateTo && r.poDate && r.poDate > dateTo) return false;
     if (search) {
-      const haystack = [r.poNo, r.awbNo, r.channel, r._channel, r.location, r.status, r.courier].join(" ").toLowerCase();
+      const haystack = [r.poNo, r.awbNo, r.channel, r._channel, r.sourceWh, r.location, r.status, r.courier].join(" ").toLowerCase();
       if (!haystack.includes(search)) return false;
     }
     return true;
@@ -605,6 +612,7 @@ function renderTable() {
     const frColor = frNum >= 95 ? "color:var(--green)" : frNum >= 80 ? "color:var(--amber)" : frNum > 0 ? "color:var(--red)" : "";
     return `<tr class="${over ? "overdue" : ""}" onclick="showDetail(${start + i})" style="cursor:pointer;">
       <td><span class="channel-pill">${esc(r.channel || r._channel)}</span></td>
+      <td>${esc(r.sourceWh)}</td>
       <td style="font-weight:500;">${esc(r.poNo)}</td>
       <td>${esc(r.poDate)}</td>
       <td>${esc(r.location)}</td>
@@ -667,7 +675,7 @@ function showDetail(idx) {
   if (!r) return;
   document.getElementById("modal-po-no").textContent = r.poNo || "PO Details";
   const fields = [
-    ["Channel", r.channel || r._channel], ["Portal", r.portal], ["PO Date", r.poDate],
+    ["Channel", r.channel || r._channel], ["Source/WH", r.sourceWh], ["Portal", r.portal], ["PO Date", r.poDate],
     ["Location/WH", r.location], ["Status", r.status], ["Dispatched Date", r.dispatchedDate],
     ["Expiry Date", r.expiryDate], ["Delivery Date", r.deliveryDate],
     ["AWB No", r.awbNo], ["Courier", r.courier],
@@ -691,7 +699,7 @@ function closeModal(e) {
 //  EXPORT
 // ═══════════════════════════════════════════════════════
 function exportCSV() {
-  const cols = ["channel","poNo","portal","poDate","location","status","dispatchedDate","expiryDate","deliveryDate","awbNo","courier","poQty","invQty","boxes","fillRate","poValue","invoiceValue","invoiceNo","remarks"];
+  const cols = ["channel","sourceWh","poNo","portal","poDate","location","status","dispatchedDate","expiryDate","deliveryDate","awbNo","courier","poQty","invQty","boxes","fillRate","poValue","invoiceValue","invoiceNo","remarks"];
   const header = cols.join(",");
   const rows = filteredRows.map(r => cols.map(c => `"${(r[c] || "").replace(/"/g, '""')}"`).join(","));
   const csv = [header, ...rows].join("\n");
@@ -704,6 +712,29 @@ function exportCSV() {
 // ═══════════════════════════════════════════════════════
 //  UTILS
 // ═══════════════════════════════════════════════════════
+function normaliseDate(d) {
+  if (!d || typeof d !== "string") return d || "";
+  d = d.trim();
+  if (!d) return "";
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+  // DD-MM-YYYY
+  let m = d.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (m) return `${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
+  // DD/MM/YYYY — if first part >12 must be day
+  m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) {
+    const [,p1,p2,yr] = m;
+    if (parseInt(p1) > 12) return `${yr}-${p2.padStart(2,"0")}-${p1.padStart(2,"0")}`;
+    // treat as MM/DD/YYYY (US style common in Sheets)
+    return `${yr}-${p1.padStart(2,"0")}-${p2.padStart(2,"0")}`;
+  }
+  // MM-DD-YYYY
+  m = d.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (m && parseInt(m[1]) <= 12) return `${m[3]}-${m[1].padStart(2,"0")}-${m[2].padStart(2,"0")}`;
+  return d;
+}
+
 function showLoading(on) { document.getElementById("loading-bar").style.display = on ? "block" : "none"; }
 function showError(msg) { const e = document.getElementById("app-error"); e.textContent = msg; e.style.display = "block"; }
 function clearError() { document.getElementById("app-error").style.display = "none"; }
