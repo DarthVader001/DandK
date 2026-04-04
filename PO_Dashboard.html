@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PO Tracker Dashboard</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f5f5f0;
+    --surface: #ffffff;
+    --border: rgba(0,0,0,0.10);
+    --text: #1a1a18;
+    --muted: #6b6b67;
+    --radius: 10px;
+    --green: #1D9E75; --green-bg: #E1F5EE; --green-text: #0F6E56;
+    --amber: #BA7517; --amber-bg: #FAEEDA; --amber-text: #854F0B;
+    --blue: #185FA5; --blue-bg: #E6F1FB; --blue-text: #0C447C;
+    --purple: #534AB7; --purple-bg: #EEEDFE; --purple-text: #3C3489;
+    --red: #A32D2D; --red-bg: #FCEBEB; --red-text: #791F1F;
+    --coral-bg: #FAECE7; --coral-text: #993C1D;
+    --teal-bg: #E1F5EE; --teal-text: #085041;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; min-height: 100vh; }
+
+  /* ── AUTH SCREEN ── */
+  #auth-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--bg); }
+  .auth-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: 16px; padding: 2.5rem 2rem; width: 360px; text-align: center; }
+  .auth-card h1 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+  .auth-card p { color: var(--muted); font-size: 13px; margin-bottom: 1.5rem; line-height: 1.5; }
+  .auth-card .brand { font-size: 28px; margin-bottom: 1rem; }
+
+  /* ── SETUP SCREEN ── */
+  #setup-screen { display: none; max-width: 700px; margin: 0 auto; padding: 2rem 1rem; }
+  #setup-screen h2 { font-size: 18px; font-weight: 600; margin-bottom: 0.5rem; }
+  #setup-screen p { color: var(--muted); font-size: 13px; margin-bottom: 1.5rem; line-height: 1.6; }
+  .sheet-entry { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 0.75rem; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .sheet-entry input { width: 100%; padding: 7px 10px; border: 0.5px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--bg); color: var(--text); }
+  .sheet-entry input:focus { outline: none; border-color: var(--blue); }
+  .sheet-entry input::placeholder { color: var(--muted); }
+  .sheet-entry label { font-size: 11px; color: var(--muted); display: block; margin-bottom: 3px; }
+  .btn-add { background: none; border: 0.5px dashed var(--border); border-radius: var(--radius); padding: 0.6rem; width: 100%; color: var(--muted); font-size: 13px; cursor: pointer; margin-bottom: 1rem; }
+  .btn-add:hover { background: var(--bg); }
+  .btn-primary { background: var(--text); color: #fff; border: none; border-radius: 8px; padding: 0.65rem 1.5rem; font-size: 14px; font-weight: 500; cursor: pointer; display: block; width: 100%; }
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-remove { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 18px; line-height: 1; padding: 2px 6px; float: right; }
+  .tip { background: var(--blue-bg); border-radius: 8px; padding: 0.75rem 1rem; font-size: 12px; color: var(--blue-text); margin-bottom: 1rem; line-height: 1.6; }
+
+  /* ── MAIN APP ── */
+  #app { display: none; }
+  header { background: var(--surface); border-bottom: 0.5px solid var(--border); padding: 0 1.5rem; height: 52px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+  header h1 { font-size: 15px; font-weight: 600; }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .btn-sm { background: none; border: 0.5px solid var(--border); border-radius: 6px; padding: 5px 12px; font-size: 12px; cursor: pointer; color: var(--text); }
+  .btn-sm:hover { background: var(--bg); }
+  .btn-sm.active { background: var(--text); color: #fff; border-color: var(--text); }
+
+  main { max-width: 1400px; margin: 0 auto; padding: 1.25rem 1.5rem; }
+
+  /* ── STAT CARDS ── */
+  .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 1.25rem; }
+  .stat { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 0.9rem 1rem; }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+  .stat-value { font-size: 22px; font-weight: 600; }
+  .stat-value.green { color: var(--green); }
+  .stat-value.amber { color: var(--amber); }
+  .stat-value.red { color: var(--red); }
+  .stat-value.blue { color: var(--blue); }
+
+  /* ── FILTERS ── */
+  .filters { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 0.9rem 1rem; margin-bottom: 1rem; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .filters select, .filters input[type=text], .filters input[type=date] {
+    padding: 6px 10px; border: 0.5px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--bg); color: var(--text); min-width: 140px;
+  }
+  .filters select:focus, .filters input:focus { outline: none; border-color: var(--blue); }
+  .search-wrap { position: relative; flex: 1; min-width: 180px; }
+  .search-wrap input { width: 100%; padding-left: 30px; }
+  .search-icon { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 13px; pointer-events: none; }
+  .filter-label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .btn-clear { background: none; border: none; font-size: 12px; color: var(--muted); cursor: pointer; padding: 4px 8px; border-radius: 4px; }
+  .btn-clear:hover { background: var(--bg); }
+
+  /* ── TABLE ── */
+  .table-wrap { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .table-meta { padding: 0.75rem 1rem; border-bottom: 0.5px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .table-meta span { font-size: 12px; color: var(--muted); }
+  .tbl-container { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { padding: 9px 12px; text-align: left; font-weight: 500; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 0.5px solid var(--border); background: var(--bg); white-space: nowrap; cursor: pointer; user-select: none; }
+  th:hover { color: var(--text); }
+  th .sort-icon { margin-left: 3px; opacity: 0.4; }
+  th.sorted .sort-icon { opacity: 1; }
+  td { padding: 9px 12px; border-bottom: 0.5px solid var(--border); color: var(--text); white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg); }
+  tr.overdue td { background: #fff8f8; }
+  tr.overdue td:first-child { border-left: 3px solid var(--red); }
+
+  /* ── BADGES ── */
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+  .badge-pending    { background: var(--amber-bg); color: var(--amber-text); }
+  .badge-conversion { background: var(--blue-bg); color: var(--blue-text); }
+  .badge-approval   { background: var(--purple-bg); color: var(--purple-text); }
+  .badge-process    { background: var(--coral-bg); color: var(--coral-text); }
+  .badge-dispatched { background: var(--green-bg); color: var(--green-text); }
+  .badge-hold       { background: var(--red-bg); color: var(--red-text); }
+  .badge-default    { background: #f0f0ec; color: #5f5e5a; }
+  .channel-pill { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; background: var(--bg); border: 0.5px solid var(--border); color: var(--muted); }
+
+  /* ── PAGINATION ── */
+  .pagination { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; border-top: 0.5px solid var(--border); }
+  .pagination span { font-size: 12px; color: var(--muted); }
+  .page-btns { display: flex; gap: 4px; }
+  .page-btn { padding: 4px 10px; border: 0.5px solid var(--border); border-radius: 5px; background: none; font-size: 12px; cursor: pointer; }
+  .page-btn:hover { background: var(--bg); }
+  .page-btn.active { background: var(--text); color: #fff; border-color: var(--text); }
+
+  /* ── LOADING / ERROR ── */
+  .loading-bar { height: 2px; background: linear-gradient(90deg, transparent, var(--blue), transparent); animation: loadbar 1.2s infinite; }
+  @keyframes loadbar { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+  .center-msg { text-align: center; padding: 3rem 1rem; color: var(--muted); font-size: 13px; }
+  .error-msg { background: var(--red-bg); color: var(--red-text); border-radius: 8px; padding: 0.75rem 1rem; font-size: 13px; margin-bottom: 1rem; }
+  .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 1rem; display: block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── MODAL (PO Detail) ── */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border-radius: 14px; padding: 1.5rem; width: 560px; max-width: 95vw; max-height: 80vh; overflow-y: auto; }
+  .modal h2 { font-size: 16px; font-weight: 600; margin-bottom: 1rem; }
+  .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
+  .modal-field { padding: 6px 0; border-bottom: 0.5px solid var(--border); }
+  .modal-field .mf-label { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+  .modal-field .mf-value { font-size: 13px; font-weight: 500; }
+  .modal-close { float: right; background: none; border: none; font-size: 20px; cursor: pointer; color: var(--muted); }
+
+  /* ── EXPORT ── */
+  .btn-export { background: none; border: 0.5px solid var(--border); border-radius: 6px; padding: 5px 12px; font-size: 12px; cursor: pointer; color: var(--text); }
+  .btn-export:hover { background: var(--bg); }
+
+  @media (max-width: 700px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    main { padding: 1rem 0.75rem; }
+    header { padding: 0 0.75rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════ AUTH SCREEN ══════════════════ -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="brand">📦</div>
+    <h1>PO Tracker</h1>
+    <p>Sign in with your Google account to load your PO sheets. Your sheet access never leaves your account.</p>
+    <div id="g_id_onload"
+      data-client_id="PASTE_YOUR_OAUTH_CLIENT_ID_HERE"
+      data-callback="handleCredential"
+      data-auto_prompt="false">
+    </div>
+    <div class="g_id_signin"
+      data-type="standard"
+      data-size="large"
+      data-theme="outline"
+      data-text="sign_in_with"
+      data-shape="rectangular"
+      data-logo_alignment="left"
+      data-width="280">
+    </div>
+    <p style="margin-top:1rem; font-size:11px; color:var(--muted);">First time? After signing in you'll configure which sheets to load.</p>
+  </div>
+</div>
+
+<!-- ══════════════════ SETUP SCREEN ══════════════════ -->
+<div id="setup-screen">
+  <h2>Configure your sheets</h2>
+  <p>Add each channel's Google Sheet below. You'll find the Sheet ID in the URL:<br>
+  <code style="font-size:12px; background:var(--bg); padding:2px 6px; border-radius:4px;">docs.google.com/spreadsheets/d/<strong>SHEET_ID_HERE</strong>/edit</code></p>
+
+  <div class="tip">
+    ℹ️ The tab name must match exactly what's in your Google Sheet (case-sensitive). If a sheet has multiple tabs, you can add the same Sheet ID multiple times with different tab names.
+  </div>
+
+  <div id="sheet-entries"></div>
+  <button class="btn-add" onclick="addSheetEntry()">+ Add another sheet / tab</button>
+
+  <div id="setup-error" class="error-msg" style="display:none;"></div>
+
+  <button class="btn-primary" onclick="saveAndLoad()">Load my PO data →</button>
+  <p style="font-size:11px; color:var(--muted); margin-top:0.75rem; text-align:center;">Your configuration is saved locally in this browser only.</p>
+</div>
+
+<!-- ══════════════════ MAIN APP ══════════════════ -->
+<div id="app">
+  <div id="loading-bar" class="loading-bar" style="display:none;"></div>
+  <header>
+    <h1>📦 PO Tracker</h1>
+    <div class="header-right">
+      <span id="last-refresh" style="font-size:11px; color:var(--muted);"></span>
+      <button class="btn-sm" onclick="refreshData()">↻ Refresh</button>
+      <button class="btn-export" onclick="exportCSV()">↓ Export CSV</button>
+      <button class="btn-sm" onclick="openSetup()" title="Edit sheets">⚙ Sheets</button>
+      <button class="btn-sm" onclick="signOut()">Sign out</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="app-error" class="error-msg" style="display:none;"></div>
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat"><div class="stat-label">Total POs</div><div class="stat-value" id="s-total">—</div></div>
+      <div class="stat"><div class="stat-label">Pending</div><div class="stat-value amber" id="s-pending">—</div></div>
+      <div class="stat"><div class="stat-label">Dispatched</div><div class="stat-value green" id="s-dispatched">—</div></div>
+      <div class="stat"><div class="stat-label">Overdue</div><div class="stat-value red" id="s-overdue">—</div></div>
+      <div class="stat"><div class="stat-label">Avg Fill Rate</div><div class="stat-value blue" id="s-fill">—</div></div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters">
+      <span class="filter-label">Filter:</span>
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="f-search" placeholder="PO No, AWB, channel…" oninput="applyFilters()">
+      </div>
+      <select id="f-channel" onchange="applyFilters()"><option value="">All channels</option></select>
+      <select id="f-status" onchange="applyFilters()">
+        <option value="">All statuses</option>
+        <option>Pending</option><option>Conversion</option><option>Approval</option>
+        <option>Process</option><option>Dispatched</option><option>Hold</option>
+      </select>
+      <select id="f-wh" onchange="applyFilters()"><option value="">All warehouses</option></select>
+      <input type="date" id="f-date-from" onchange="applyFilters()" title="PO date from">
+      <input type="date" id="f-date-to" onchange="applyFilters()" title="PO date to">
+      <button class="btn-clear" onclick="clearFilters()">Clear</button>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap">
+      <div class="table-meta">
+        <span id="row-count">— rows</span>
+        <span id="sheet-tabs" style="font-size:11px; color:var(--muted);"></span>
+      </div>
+      <div class="tbl-container">
+        <table id="po-table">
+          <thead>
+            <tr>
+              <th onclick="sortBy('channel')" data-col="channel">Channel <span class="sort-icon">↕</span></th>
+              <th onclick="sortBy('poNo')" data-col="poNo">PO No <span class="sort-icon">↕</span></th>
+              <th onclick="sortBy('poDate')" data-col="poDate">PO Date <span class="sort-icon">↕</span></th>
+              <th onclick="sortBy('location')" data-col="location">Location/WH <span class="sort-icon">↕</span></th>
+              <th onclick="sortBy('status')" data-col="status">Status <span class="sort-icon">↕</span></th>
+              <th onclick="sortBy('expiryDate')" data-col="expiryDate">Expiry <span class="sort-icon">↕</span></th>
+              <th onclick="sortBy('dispatchedDate')" data-col="dispatchedDate">Dispatched <span class="sort-icon">↕</span></th>
+              <th onclick="sortBy('awbNo')" data-col="awbNo">AWB No <span class="sort-icon">↕</span></th>
+              <th onclick="sortBy('fillRate')" data-col="fillRate">Fill % <span class="sort-icon">↕</span></th>
+              <th onclick="sortBy('poQty')" data-col="poQty">PO Qty <span class="sort-icon">↕</span></th>
+              <th onclick="sortBy('invQty')" data-col="invQty">Inv Qty <span class="sort-icon">↕</span></th>
+              <th onclick="sortBy('invoiceValue')" data-col="invoiceValue">Inv Value <span class="sort-icon">↕</span></th>
+              <th>Remarks</th>
+            </tr>
+          </thead>
+          <tbody id="po-tbody">
+            <tr><td colspan="13" class="center-msg"><div class="spinner"></div>Loading PO data…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <span id="page-info">—</span>
+        <div class="page-btns" id="page-btns"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ══════════════════ DETAIL MODAL ══════════════════ -->
+<div class="modal-overlay" id="detail-modal" onclick="closeModal(event)">
+  <div class="modal">
+    <button class="modal-close" onclick="document.getElementById('detail-modal').classList.remove('open')">×</button>
+    <h2 id="modal-po-no">PO Details</h2>
+    <div class="modal-grid" id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  CONFIGURATION — fill these in
+// ═══════════════════════════════════════════════════════
+const OAUTH_CLIENT_ID = "PASTE_YOUR_OAUTH_CLIENT_ID_HERE"; // same as data-client_id above
+
+// Column name mapping — maps your actual sheet headers to internal keys
+// Left side = your sheet header (case-insensitive), Right = internal key
+const COL_MAP = {
+  "source":           "channel",
+  "po no":            "poNo",
+  "po number":        "poNo",
+  "portal":           "portal",
+  "po date":          "poDate",
+  "location":         "location",
+  "status":           "status",
+  "dispatched date":  "dispatchedDate",
+  "remarks":          "remarks",
+  "appointment date": "apptDate",
+  "appointment time": "apptTime",
+  "appointment id":   "apptId",
+  "expiry date":      "expiryDate",
+  "delivery date":    "deliveryDate",
+  "courier":          "courier",
+  "awb no":           "awbNo",
+  "awb":              "awbNo",
+  "po qty":           "poQty",
+  "inv qty":          "invQty",
+  "boxes":            "boxes",
+  "fill rate":        "fillRate",
+  "po value":         "poValue",
+  "invoice value":    "invoiceValue",
+  "invoice no":       "invoiceNo",
+};
+
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
+let accessToken = null;
+let allRows = [];
+let filteredRows = [];
+let currentPage = 1;
+const PAGE_SIZE = 100;
+let sortCol = "poDate";
+let sortDir = -1; // -1 = desc
+
+// ═══════════════════════════════════════════════════════
+//  AUTH
+// ═══════════════════════════════════════════════════════
+function handleCredential(response) {
+  // Exchange ID token for access token via implicit flow
+  const clientId = OAUTH_CLIENT_ID;
+  const scope = "https://www.googleapis.com/auth/spreadsheets.readonly";
+  const redirectUri = window.location.href.split("?")[0];
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?response_type=token&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}`;
+  window.location.href = authUrl;
+}
+
+function checkOAuthCallback() {
+  const hash = window.location.hash;
+  if (hash.includes("access_token=")) {
+    const params = new URLSearchParams(hash.replace("#", "?").slice(1));
+    accessToken = params.get("access_token");
+    window.history.replaceState({}, "", window.location.pathname);
+    showAppOrSetup();
+    return true;
+  }
+  return false;
+}
+
+function showAppOrSetup() {
+  document.getElementById("auth-screen").style.display = "none";
+  const config = loadConfig();
+  if (!config || config.sheets.length === 0) {
+    showSetup();
+  } else {
+    showApp();
+    loadAllSheets(config.sheets);
+  }
+}
+
+function signOut() {
+  accessToken = null;
+  location.reload();
+}
+
+// ═══════════════════════════════════════════════════════
+//  SETUP
+// ═══════════════════════════════════════════════════════
+function showSetup() {
+  document.getElementById("setup-screen").style.display = "block";
+  document.getElementById("app").style.display = "none";
+  const config = loadConfig();
+  const existing = config ? config.sheets : [{ id: "", tab: "", name: "" }];
+  existing.forEach(s => addSheetEntry(s.id, s.tab, s.name));
+}
+
+function openSetup() {
+  document.getElementById("sheet-entries").innerHTML = "";
+  showSetup();
+}
+
+let entryCount = 0;
+function addSheetEntry(id = "", tab = "", name = "") {
+  entryCount++;
+  const d = document.createElement("div");
+  d.className = "sheet-entry";
+  d.id = "entry-" + entryCount;
+  d.innerHTML = `
+    <div style="grid-column: 1/-1; display:flex; justify-content:space-between; align-items:center;">
+      <span style="font-size:12px; font-weight:500; color:var(--muted);">Sheet ${entryCount}</span>
+      <button class="btn-remove" onclick="this.closest('.sheet-entry').remove()">×</button>
+    </div>
+    <div>
+      <label>Sheet ID (from URL)</label>
+      <input type="text" class="se-id" value="${id}" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms">
+    </div>
+    <div>
+      <label>Tab name (exact)</label>
+      <input type="text" class="se-tab" value="${tab}" placeholder="Blinkit">
+    </div>
+    <div style="grid-column: 1/-1;">
+      <label>Friendly name (optional)</label>
+      <input type="text" class="se-name" value="${name}" placeholder="e.g. Blinkit — Quick Com">
+    </div>
+  `;
+  document.getElementById("sheet-entries").appendChild(d);
+}
+
+function saveAndLoad() {
+  const entries = document.querySelectorAll(".sheet-entry");
+  const sheets = [];
+  let valid = true;
+  entries.forEach(e => {
+    const id = e.querySelector(".se-id").value.trim();
+    const tab = e.querySelector(".se-tab").value.trim();
+    const name = e.querySelector(".se-name").value.trim();
+    if (id && tab) sheets.push({ id, tab, name: name || tab });
+    else if (id || tab) valid = false;
+  });
+  if (!valid) { showSetupError("Please fill in both Sheet ID and Tab name for each row (or remove incomplete rows)."); return; }
+  if (sheets.length === 0) { showSetupError("Add at least one sheet."); return; }
+  saveConfig({ sheets });
+  document.getElementById("setup-error").style.display = "none";
+  showApp();
+  loadAllSheets(sheets);
+}
+
+function showSetupError(msg) {
+  const el = document.getElementById("setup-error");
+  el.textContent = msg;
+  el.style.display = "block";
+}
+
+function saveConfig(c) { try { localStorage.setItem("po_tracker_config", JSON.stringify(c)); } catch(e) {} }
+function loadConfig() { try { const s = localStorage.getItem("po_tracker_config"); return s ? JSON.parse(s) : null; } catch(e) { return null; } }
+
+// ═══════════════════════════════════════════════════════
+//  DATA LOADING
+// ═══════════════════════════════════════════════════════
+function showApp() {
+  document.getElementById("setup-screen").style.display = "none";
+  document.getElementById("app").style.display = "block";
+}
+
+async function loadAllSheets(sheets) {
+  showLoading(true);
+  clearError();
+  allRows = [];
+  const results = await Promise.allSettled(sheets.map(s => fetchSheet(s)));
+  results.forEach((r, i) => {
+    if (r.status === "fulfilled") allRows.push(...r.value);
+    else console.warn("Failed to load", sheets[i].name, r.reason);
+  });
+
+  if (allRows.length === 0) {
+    showError("No data loaded. Check your Sheet IDs and tab names — they must match exactly. Make sure each sheet is shared with your Google account.");
+    showLoading(false);
+    return;
+  }
+
+  populateFilters();
+  applyFilters();
+  updateStats();
+  showLoading(false);
+  document.getElementById("last-refresh").textContent = "Updated " + new Date().toLocaleTimeString();
+  document.getElementById("sheet-tabs").textContent = sheets.map(s => s.name).join(" · ");
+}
+
+async function fetchSheet(sheet) {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheet.id}/values/${encodeURIComponent(sheet.tab)}?valueRenderOption=FORMATTED_VALUE`;
+  const res = await fetch(url, { headers: { Authorization: "Bearer " + accessToken } });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  const rows = data.values || [];
+  if (rows.length < 2) return [];
+  const headers = rows[0].map(h => (h || "").toLowerCase().trim());
+  return rows.slice(1).map((row, i) => {
+    const obj = { _channel: sheet.name, _rowIndex: i + 2 };
+    headers.forEach((h, ci) => {
+      const key = COL_MAP[h] || h;
+      obj[key] = row[ci] || "";
+    });
+    // derived fill rate
+    if (!obj.fillRate && obj.poQty && obj.invQty) {
+      const pq = parseFloat(obj.poQty), iq = parseFloat(obj.invQty);
+      if (pq > 0) obj.fillRate = ((iq / pq) * 100).toFixed(1) + "%";
+    }
+    if (!obj.channel) obj.channel = sheet.name;
+    return obj;
+  }).filter(r => r.poNo || r.channel);
+}
+
+function refreshData() {
+  const config = loadConfig();
+  if (config) loadAllSheets(config.sheets);
+}
+
+// ═══════════════════════════════════════════════════════
+//  FILTERS & TABLE
+// ═══════════════════════════════════════════════════════
+function populateFilters() {
+  const channels = [...new Set(allRows.map(r => r.channel || r._channel).filter(Boolean))].sort();
+  const whs = [...new Set(allRows.map(r => r.location).filter(Boolean))].sort();
+  const chSel = document.getElementById("f-channel");
+  const whSel = document.getElementById("f-wh");
+  chSel.innerHTML = '<option value="">All channels</option>' + channels.map(c => `<option>${c}</option>`).join("");
+  whSel.innerHTML = '<option value="">All warehouses</option>' + whs.map(w => `<option>${w}</option>`).join("");
+}
+
+function applyFilters() {
+  const search = document.getElementById("f-search").value.toLowerCase();
+  const channel = document.getElementById("f-channel").value;
+  const status = document.getElementById("f-status").value.toLowerCase();
+  const wh = document.getElementById("f-wh").value;
+  const dateFrom = document.getElementById("f-date-from").value;
+  const dateTo = document.getElementById("f-date-to").value;
+
+  filteredRows = allRows.filter(r => {
+    if (channel && (r.channel || r._channel) !== channel) return false;
+    if (status && (r.status || "").toLowerCase() !== status) return false;
+    if (wh && r.location !== wh) return false;
+    if (dateFrom && r.poDate && r.poDate < dateFrom) return false;
+    if (dateTo && r.poDate && r.poDate > dateTo) return false;
+    if (search) {
+      const haystack = [r.poNo, r.awbNo, r.channel, r._channel, r.location, r.status, r.courier].join(" ").toLowerCase();
+      if (!haystack.includes(search)) return false;
+    }
+    return true;
+  });
+
+  sortRows();
+  currentPage = 1;
+  renderTable();
+  updateStats();
+}
+
+function clearFilters() {
+  ["f-search","f-date-from","f-date-to"].forEach(id => document.getElementById(id).value = "");
+  ["f-channel","f-status","f-wh"].forEach(id => document.getElementById(id).selectedIndex = 0);
+  applyFilters();
+}
+
+function sortBy(col) {
+  if (sortCol === col) sortDir *= -1; else { sortCol = col; sortDir = -1; }
+  document.querySelectorAll("th").forEach(th => th.classList.remove("sorted"));
+  document.querySelector(`th[data-col="${col}"]`)?.classList.add("sorted");
+  sortRows();
+  renderTable();
+}
+
+function sortRows() {
+  filteredRows.sort((a, b) => {
+    const av = a[sortCol] || "";
+    const bv = b[sortCol] || "";
+    if (!isNaN(parseFloat(av)) && !isNaN(parseFloat(bv))) return sortDir * (parseFloat(av) - parseFloat(bv));
+    return sortDir * av.localeCompare(bv);
+  });
+}
+
+const today = new Date().toISOString().slice(0, 10);
+
+function isOverdue(row) {
+  if (!row.expiryDate) return false;
+  const status = (row.status || "").toLowerCase();
+  if (status === "dispatched" || status === "delivered") return false;
+  return row.expiryDate < today;
+}
+
+function badgeClass(status) {
+  const s = (status || "").toLowerCase();
+  if (s === "pending") return "badge-pending";
+  if (s === "conversion") return "badge-conversion";
+  if (s === "approval") return "badge-approval";
+  if (s === "process") return "badge-process";
+  if (s === "dispatched" || s === "delivered") return "badge-dispatched";
+  if (s === "hold" || s === "rto") return "badge-hold";
+  return "badge-default";
+}
+
+function renderTable() {
+  const tbody = document.getElementById("po-tbody");
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const page = filteredRows.slice(start, start + PAGE_SIZE);
+
+  if (page.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="13" class="center-msg">No POs match your filters.</td></tr>`;
+    document.getElementById("row-count").textContent = "0 rows";
+    renderPagination();
+    return;
+  }
+
+  document.getElementById("row-count").textContent = filteredRows.length.toLocaleString() + " rows";
+  tbody.innerHTML = page.map((r, i) => {
+    const over = isOverdue(r);
+    const fr = r.fillRate ? (r.fillRate + (r.fillRate.includes("%") ? "" : "%")) : "—";
+    const frNum = parseFloat(r.fillRate) || 0;
+    const frColor = frNum >= 95 ? "color:var(--green)" : frNum >= 80 ? "color:var(--amber)" : frNum > 0 ? "color:var(--red)" : "";
+    return `<tr class="${over ? "overdue" : ""}" onclick="showDetail(${start + i})" style="cursor:pointer;">
+      <td><span class="channel-pill">${esc(r.channel || r._channel)}</span></td>
+      <td style="font-weight:500;">${esc(r.poNo)}</td>
+      <td>${esc(r.poDate)}</td>
+      <td>${esc(r.location)}</td>
+      <td><span class="badge ${badgeClass(r.status)}">${esc(r.status || "—")}</span></td>
+      <td style="${over ? "color:var(--red);font-weight:500;" : ""}">${esc(r.expiryDate)}</td>
+      <td>${esc(r.dispatchedDate)}</td>
+      <td style="font-family:monospace; font-size:12px;">${esc(r.awbNo)}</td>
+      <td style="${frColor}; font-weight:500;">${fr}</td>
+      <td>${esc(r.poQty)}</td>
+      <td>${esc(r.invQty)}</td>
+      <td>${esc(r.invoiceValue)}</td>
+      <td style="max-width:180px; overflow:hidden; text-overflow:ellipsis;" title="${esc(r.remarks)}">${esc(r.remarks)}</td>
+    </tr>`;
+  }).join("");
+
+  renderPagination();
+}
+
+function esc(s) { return (s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+function renderPagination() {
+  const total = filteredRows.length;
+  const pages = Math.ceil(total / PAGE_SIZE);
+  document.getElementById("page-info").textContent = `Page ${currentPage} of ${pages} (${total.toLocaleString()} rows)`;
+  const btns = document.getElementById("page-btns");
+  if (pages <= 1) { btns.innerHTML = ""; return; }
+  let html = `<button class="page-btn" onclick="goPage(${currentPage - 1})" ${currentPage === 1 ? "disabled" : ""}>‹</button>`;
+  for (let p = Math.max(1, currentPage - 2); p <= Math.min(pages, currentPage + 2); p++) {
+    html += `<button class="page-btn ${p === currentPage ? "active" : ""}" onclick="goPage(${p})">${p}</button>`;
+  }
+  html += `<button class="page-btn" onclick="goPage(${currentPage + 1})" ${currentPage === pages ? "disabled" : ""}>›</button>`;
+  btns.innerHTML = html;
+}
+
+function goPage(p) { const pages = Math.ceil(filteredRows.length / PAGE_SIZE); currentPage = Math.max(1, Math.min(pages, p)); renderTable(); }
+
+// ═══════════════════════════════════════════════════════
+//  STATS
+// ═══════════════════════════════════════════════════════
+function updateStats() {
+  const rows = filteredRows;
+  const total = rows.length;
+  const dispatched = rows.filter(r => (r.status || "").toLowerCase() === "dispatched" || (r.status || "").toLowerCase() === "delivered").length;
+  const pending = rows.filter(r => { const s = (r.status || "").toLowerCase(); return s !== "dispatched" && s !== "delivered"; }).length;
+  const overdue = rows.filter(isOverdue).length;
+  const fills = rows.map(r => parseFloat(r.fillRate)).filter(n => !isNaN(n) && n > 0);
+  const avgFill = fills.length ? (fills.reduce((a, b) => a + b, 0) / fills.length).toFixed(1) + "%" : "—";
+  document.getElementById("s-total").textContent = total.toLocaleString();
+  document.getElementById("s-dispatched").textContent = dispatched.toLocaleString();
+  document.getElementById("s-pending").textContent = pending.toLocaleString();
+  document.getElementById("s-overdue").textContent = overdue.toLocaleString();
+  document.getElementById("s-fill").textContent = avgFill;
+}
+
+// ═══════════════════════════════════════════════════════
+//  DETAIL MODAL
+// ═══════════════════════════════════════════════════════
+function showDetail(idx) {
+  const r = filteredRows[idx];
+  if (!r) return;
+  document.getElementById("modal-po-no").textContent = r.poNo || "PO Details";
+  const fields = [
+    ["Channel", r.channel || r._channel], ["Portal", r.portal], ["PO Date", r.poDate],
+    ["Location/WH", r.location], ["Status", r.status], ["Dispatched Date", r.dispatchedDate],
+    ["Expiry Date", r.expiryDate], ["Delivery Date", r.deliveryDate],
+    ["AWB No", r.awbNo], ["Courier", r.courier],
+    ["PO Qty", r.poQty], ["Inv Qty", r.invQty], ["Boxes", r.boxes],
+    ["Fill Rate", r.fillRate], ["PO Value", r.poValue],
+    ["Invoice Value", r.invoiceValue], ["Invoice No", r.invoiceNo],
+    ["Appt Date", r.apptDate], ["Appt Time", r.apptTime], ["Appt ID", r.apptId],
+    ["Remarks", r.remarks],
+  ];
+  document.getElementById("modal-body").innerHTML = fields.filter(([,v]) => v).map(([l, v]) =>
+    `<div class="modal-field"><div class="mf-label">${l}</div><div class="mf-value">${esc(v)}</div></div>`
+  ).join("");
+  document.getElementById("detail-modal").classList.add("open");
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById("detail-modal")) document.getElementById("detail-modal").classList.remove("open");
+}
+
+// ═══════════════════════════════════════════════════════
+//  EXPORT
+// ═══════════════════════════════════════════════════════
+function exportCSV() {
+  const cols = ["channel","poNo","portal","poDate","location","status","dispatchedDate","expiryDate","deliveryDate","awbNo","courier","poQty","invQty","boxes","fillRate","poValue","invoiceValue","invoiceNo","remarks"];
+  const header = cols.join(",");
+  const rows = filteredRows.map(r => cols.map(c => `"${(r[c] || "").replace(/"/g, '""')}"`).join(","));
+  const csv = [header, ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = "PO_Export_" + new Date().toISOString().slice(0,10) + ".csv";
+  a.click();
+}
+
+// ═══════════════════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════════════════
+function showLoading(on) { document.getElementById("loading-bar").style.display = on ? "block" : "none"; }
+function showError(msg) { const e = document.getElementById("app-error"); e.textContent = msg; e.style.display = "block"; }
+function clearError() { document.getElementById("app-error").style.display = "none"; }
+
+// ═══════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════
+if (!checkOAuthCallback()) {
+  // Show auth screen — Google Sign-In button renders automatically
+}
+</script>
+</body>
+</html>
