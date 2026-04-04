@@ -534,8 +534,8 @@ function applyFilters() {
     if (channel && (r.channel || r._channel) !== channel) return false;
     if (status && (r.status || "").toLowerCase() !== status) return false;
     if (wh && r.location !== wh) return false;
-    if (dateFrom && r.poDate && r.poDate < dateFrom) return false;
-    if (dateTo && r.poDate && r.poDate > dateTo) return false;
+    if (dateFrom && r.poDate) { const nd = normaliseDate(r.poDate); if (nd && nd < dateFrom) return false; }
+    if (dateTo && r.poDate) { const nd = normaliseDate(r.poDate); if (nd && nd > dateTo) return false; }
     if (search) {
       const haystack = [r.poNo, r.awbNo, r.channel, r._channel, r.sourceWh, r.location, r.status, r.courier].join(" ").toLowerCase();
       if (!haystack.includes(search)) return false;
@@ -713,25 +713,32 @@ function exportCSV() {
 //  UTILS
 // ═══════════════════════════════════════════════════════
 function normaliseDate(d) {
-  if (!d || typeof d !== "string") return d || "";
+  if (!d || typeof d !== "string") return "";
   d = d.trim();
   if (!d) return "";
   // Already YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
-  // DD-MM-YYYY
+  // DD-MM-YYYY e.g. 27-02-2023
   let m = d.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
   if (m) return `${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
-  // DD/MM/YYYY — if first part >12 must be day
+  // D/M/YYYY or M/D/YYYY
   m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (m) {
-    const [,p1,p2,yr] = m;
-    if (parseInt(p1) > 12) return `${yr}-${p2.padStart(2,"0")}-${p1.padStart(2,"0")}`;
-    // treat as MM/DD/YYYY (US style common in Sheets)
-    return `${yr}-${p1.padStart(2,"0")}-${p2.padStart(2,"0")}`;
+    const p1 = parseInt(m[1]), p2 = parseInt(m[2]), yr = m[3];
+    if (p1 > 12) return `${yr}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
+    if (p2 > 12) return `${yr}-${m[1].padStart(2,"0")}-${m[2].padStart(2,"0")}`;
+    // ambiguous — Indian Sheets default is DD/MM/YYYY
+    return `${yr}-${m[1].padStart(2,"0")}-${m[2].padStart(2,"0")}`;
   }
-  // MM-DD-YYYY
-  m = d.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
-  if (m && parseInt(m[1]) <= 12) return `${m[3]}-${m[1].padStart(2,"0")}-${m[2].padStart(2,"0")}`;
+  // 2-digit year D/M/YY
+  m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+  if (m) {
+    const yr = parseInt(m[3]) > 50 ? "19"+m[3] : "20"+m[3];
+    return `${yr}-${m[1].padStart(2,"0")}-${m[2].padStart(2,"0")}`;
+  }
+  // Last resort native parse
+  const p = new Date(d);
+  if (!isNaN(p)) return p.toISOString().slice(0,10);
   return d;
 }
 
