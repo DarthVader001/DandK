@@ -493,8 +493,7 @@ async function fetchSheet(sheet) {
     if (!obj.fillRate && obj.poQty && obj.invQty) {
       const pq = parseFloat(obj.poQty), iq = parseFloat(obj.invQty);
       if (pq > 0) obj.fillRate = ((iq / pq) * 100).toFixed(1) + "%";
-    }
-    if (!obj.channel) obj.channel = sheet.name;
+    }obj.channel = sheet.name;
     return obj;
   }).filter(r => r.poNo || r.channel);
 }
