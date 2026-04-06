@@ -584,9 +584,9 @@ function isOverdue(row) {
 function badgeClass(status) {
   const s = (status || "").toLowerCase();
   if (s === "pending") return "badge-pending";
-  if (s === "conversion") return "badge-conversion";
-  if (s === "approval") return "badge-approval";
-  if (s === "process") return "badge-process";
+  if (s === "conversion pending") return "badge-conversion";
+  if (s === "approval pending") return "badge-approval";
+  if (s === "process pending") return "badge-process";
   if (s === "dispatched" || s === "delivered") return "badge-dispatched";
   if (s === "hold" || s === "rto") return "badge-hold";
   return "badge-default";
