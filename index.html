@@ -21,6 +21,7 @@
     --red: #A32D2D; --red-bg: #FCEBEB; --red-text: #791F1F;
     --coral-bg: #FAECE7; --coral-text: #993C1D;
     --teal-bg: #E1F5EE; --teal-text: #085041;
+    --orange: #C05B00; --orange-bg: #FEF0E0; --orange-text: #8A3E00;
   }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; min-height: 100vh; }
 
@@ -99,13 +100,15 @@
 
   /* ── BADGES ── */
   .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap; }
-  .badge-pending    { background: var(--amber-bg); color: var(--amber-text); }
-  .badge-conversion { background: var(--blue-bg); color: var(--blue-text); }
-  .badge-approval   { background: var(--purple-bg); color: var(--purple-text); }
-  .badge-process    { background: var(--coral-bg); color: var(--coral-text); }
-  .badge-dispatched { background: var(--green-bg); color: var(--green-text); }
-  .badge-hold       { background: var(--red-bg); color: var(--red-text); }
-  .badge-default    { background: #f0f0ec; color: #5f5e5a; }
+  .badge-pending          { background: var(--amber-bg);  color: var(--amber-text); }
+  .badge-conversion       { background: var(--blue-bg);   color: var(--blue-text); }
+  .badge-approval         { background: var(--purple-bg); color: var(--purple-text); }
+  .badge-process          { background: var(--coral-bg);  color: var(--coral-text); }
+  .badge-dispatch         { background: var(--orange-bg); color: var(--orange-text); }
+  .badge-dispatched       { background: var(--green-bg);  color: var(--green-text); }
+  .badge-delivered        { background: var(--teal-bg);   color: var(--teal-text); }
+  .badge-hold             { background: var(--red-bg);    color: var(--red-text); }
+  .badge-default          { background: #f0f0ec; color: #5f5e5a; }
   .channel-pill { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; background: var(--bg); border: 0.5px solid var(--border); color: var(--muted); }
 
   /* ── PAGINATION ── */
@@ -227,8 +230,15 @@
       <select id="f-channel" onchange="applyFilters()"><option value="">All channels</option></select>
       <select id="f-status" onchange="applyFilters()">
         <option value="">All statuses</option>
-        <option>Pending</option><option>Conversion</option><option>Approval</option>
-        <option>Process</option><option>Dispatched</option><option>Hold</option>
+        <option value="pending">Pending</option>
+        <option value="conversion pending">Conversion Pending</option>
+        <option value="approval pending">Approval Pending</option>
+        <option value="process pending">Process Pending</option>
+        <option value="dispatch pending">Dispatch Pending</option>
+        <option value="dispatched">Dispatched</option>
+        <option value="delivered">Delivered</option>
+        <option value="hold">Hold</option>
+        <option value="rto">RTO</option>
       </select>
       <select id="f-wh" onchange="applyFilters()"><option value="">All warehouses</option></select>
       <input type="date" id="f-date-from" onchange="applyFilters()" title="PO date from">
@@ -263,7 +273,7 @@
             </tr>
           </thead>
           <tbody id="po-tbody">
-            <tr><td colspan="13" class="center-msg"><div class="spinner"></div>Loading PO data…</td></tr>
+            <tr><td colspan="14" class="center-msg"><div class="spinner"></div>Loading PO data…</td></tr>
           </tbody>
         </table>
       </div>
@@ -286,14 +296,12 @@
 
 <script>
 // ═══════════════════════════════════════════════════════
-//  CONFIGURATION — fill these in
+//  CONFIGURATION
 // ═══════════════════════════════════════════════════════
-const OAUTH_CLIENT_ID = "463035787922-tpie873ujm0b03cousnoan1np4t7jhvs.apps.googleusercontent.com"; // same as data-client_id above
+const OAUTH_CLIENT_ID = "463035787922-tpie873ujm0b03cousnoan1np4t7jhvs.apps.googleusercontent.com";
 
-// Column name mapping — maps your actual sheet headers to internal keys
-// Left side = your sheet header (case-insensitive), Right = internal key
 const COL_MAP = {
-  "source":           "sourceWh",
+  "Dispatch WH":           "sourceWh",
   "po no":            "poNo",
   "po number":        "poNo",
   "portal":           "portal",
@@ -317,6 +325,7 @@ const COL_MAP = {
   "po value":         "poValue",
   "invoice value":    "invoiceValue",
   "invoice no":       "invoiceNo",
+  "inward date":      "inwardDate",
 };
 
 // ═══════════════════════════════════════════════════════
@@ -328,16 +337,15 @@ let filteredRows = [];
 let currentPage = 1;
 const PAGE_SIZE = 100;
 let sortCol = "poDate";
-let sortDir = -1; // -1 = desc
+let sortDir = -1;
 
 // ═══════════════════════════════════════════════════════
 //  AUTH
 // ═══════════════════════════════════════════════════════
 function handleCredential(response) {
-  // Exchange ID token for access token via implicit flow
   const clientId = OAUTH_CLIENT_ID;
   const scope = "https://www.googleapis.com/auth/spreadsheets.readonly";
-  const redirectUri = window.location.href.split("?")[0];
+  const redirectUri = window.location.href.split("?")[0].split("#")[0];
   const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?response_type=token&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}`;
   window.location.href = authUrl;
 }
@@ -460,7 +468,7 @@ async function loadAllSheets(sheets) {
   });
 
   if (allRows.length === 0) {
-    showError("No data loaded. Check your Sheet IDs and tab names — they must match exactly. Make sure each sheet is shared with your Google account.");
+    showError("No data loaded. Check your Sheet IDs and tab names — they must match exactly.");
     showLoading(false);
     return;
   }
@@ -500,6 +508,7 @@ async function fetchSheet(sheet) {
     obj.expiryDate     = normaliseDate(obj.expiryDate);
     obj.deliveryDate   = normaliseDate(obj.deliveryDate);
     obj.apptDate       = normaliseDate(obj.apptDate);
+    // Always use sheet tab name as channel
     obj.channel = sheet.name;
     return obj;
   }).filter(r => r.poNo || r.channel);
@@ -514,7 +523,7 @@ function refreshData() {
 //  FILTERS & TABLE
 // ═══════════════════════════════════════════════════════
 function populateFilters() {
-  const channels = [...new Set(allRows.map(r => r.channel || r._channel).filter(Boolean))].sort();
+  const channels = [...new Set(allRows.map(r => r.channel).filter(Boolean))].sort();
   const whs = [...new Set(allRows.map(r => r.location).filter(Boolean))].sort();
   const chSel = document.getElementById("f-channel");
   const whSel = document.getElementById("f-wh");
@@ -523,21 +532,22 @@ function populateFilters() {
 }
 
 function applyFilters() {
-  const search = document.getElementById("f-search").value.toLowerCase();
-  const channel = document.getElementById("f-channel").value;
-  const status = document.getElementById("f-status").value.toLowerCase();
-  const wh = document.getElementById("f-wh").value;
+  const search   = document.getElementById("f-search").value.toLowerCase();
+  const channel  = document.getElementById("f-channel").value;
+  const status   = document.getElementById("f-status").value.toLowerCase(); // already lowercase value
+  const wh       = document.getElementById("f-wh").value;
   const dateFrom = document.getElementById("f-date-from").value;
-  const dateTo = document.getElementById("f-date-to").value;
+  const dateTo   = document.getElementById("f-date-to").value;
 
   filteredRows = allRows.filter(r => {
-    if (channel && (r.channel || r._channel) !== channel) return false;
+    if (channel && r.channel !== channel) return false;
+    // Status comparison: compare lowercase of row status against filter value
     if (status && (r.status || "").toLowerCase() !== status) return false;
     if (wh && r.location !== wh) return false;
-    if (dateFrom && r.poDate) { const nd = normaliseDate(r.poDate); if (nd && nd < dateFrom) return false; }
-    if (dateTo && r.poDate) { const nd = normaliseDate(r.poDate); if (nd && nd > dateTo) return false; }
+    if (dateFrom && r.poDate && r.poDate < dateFrom) return false;
+    if (dateTo   && r.poDate && r.poDate > dateTo)   return false;
     if (search) {
-      const haystack = [r.poNo, r.awbNo, r.channel, r._channel, r.sourceWh, r.location, r.status, r.courier].join(" ").toLowerCase();
+      const haystack = [r.poNo, r.awbNo, r.channel, r.sourceWh, r.location, r.status, r.courier, r.portal].join(" ").toLowerCase();
       if (!haystack.includes(search)) return false;
     }
     return true;
@@ -576,18 +586,21 @@ const today = new Date().toISOString().slice(0, 10);
 
 function isOverdue(row) {
   if (!row.expiryDate) return false;
-  const status = (row.status || "").toLowerCase();
-  if (status === "dispatched" || status === "delivered") return false;
+  const s = (row.status || "").toLowerCase();
+  if (s === "dispatched" || s === "delivered") return false;
   return row.expiryDate < today;
 }
 
+// ── BADGE CLASS — matches exact status values from your sheets ──
 function badgeClass(status) {
-  const s = (status || "").toLowerCase();
-  if (s === "pending") return "badge-pending";
-  if (s === "conversion pending") return "badge-conversion";
-  if (s === "approval pending") return "badge-approval";
-  if (s === "process pending") return "badge-process";
-  if (s === "dispatched" || s === "delivered") return "badge-dispatched";
+  const s = (status || "").toLowerCase().trim();
+  if (s === "pending")             return "badge-pending";
+  if (s === "conversion pending")  return "badge-conversion";
+  if (s === "approval pending")    return "badge-approval";
+  if (s === "process pending")     return "badge-process";
+  if (s === "dispatch pending")    return "badge-dispatch";
+  if (s === "dispatched")          return "badge-dispatched";
+  if (s === "delivered")           return "badge-delivered";
   if (s === "hold" || s === "rto") return "badge-hold";
   return "badge-default";
 }
@@ -595,10 +608,10 @@ function badgeClass(status) {
 function renderTable() {
   const tbody = document.getElementById("po-tbody");
   const start = (currentPage - 1) * PAGE_SIZE;
-  const page = filteredRows.slice(start, start + PAGE_SIZE);
+  const page  = filteredRows.slice(start, start + PAGE_SIZE);
 
   if (page.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="13" class="center-msg">No POs match your filters.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="14" class="center-msg">No POs match your filters.</td></tr>`;
     document.getElementById("row-count").textContent = "0 rows";
     renderPagination();
     return;
@@ -606,12 +619,12 @@ function renderTable() {
 
   document.getElementById("row-count").textContent = filteredRows.length.toLocaleString() + " rows";
   tbody.innerHTML = page.map((r, i) => {
-    const over = isOverdue(r);
-    const fr = r.fillRate ? (r.fillRate + (r.fillRate.includes("%") ? "" : "%")) : "—";
+    const over  = isOverdue(r);
+    const fr    = r.fillRate ? (r.fillRate + (r.fillRate.includes("%") ? "" : "%")) : "—";
     const frNum = parseFloat(r.fillRate) || 0;
     const frColor = frNum >= 95 ? "color:var(--green)" : frNum >= 80 ? "color:var(--amber)" : frNum > 0 ? "color:var(--red)" : "";
     return `<tr class="${over ? "overdue" : ""}" onclick="showDetail(${start + i})" style="cursor:pointer;">
-      <td><span class="channel-pill">${esc(r.channel || r._channel)}</span></td>
+      <td><span class="channel-pill">${esc(r.channel)}</span></td>
       <td>${esc(r.sourceWh)}</td>
       <td style="font-weight:500;">${esc(r.poNo)}</td>
       <td>${esc(r.poDate)}</td>
@@ -647,24 +660,34 @@ function renderPagination() {
   btns.innerHTML = html;
 }
 
-function goPage(p) { const pages = Math.ceil(filteredRows.length / PAGE_SIZE); currentPage = Math.max(1, Math.min(pages, p)); renderTable(); }
+function goPage(p) {
+  const pages = Math.ceil(filteredRows.length / PAGE_SIZE);
+  currentPage = Math.max(1, Math.min(pages, p));
+  renderTable();
+}
 
 // ═══════════════════════════════════════════════════════
 //  STATS
 // ═══════════════════════════════════════════════════════
 function updateStats() {
-  const rows = filteredRows;
-  const total = rows.length;
-  const dispatched = rows.filter(r => (r.status || "").toLowerCase() === "dispatched" || (r.status || "").toLowerCase() === "delivered").length;
-  const pending = rows.filter(r => { const s = (r.status || "").toLowerCase(); return s !== "dispatched" && s !== "delivered"; }).length;
+  const rows       = filteredRows;
+  const total      = rows.length;
+  const dispatched = rows.filter(r => {
+    const s = (r.status || "").toLowerCase();
+    return s === "dispatched" || s === "delivered";
+  }).length;
+  const pending = rows.filter(r => {
+    const s = (r.status || "").toLowerCase();
+    return s !== "dispatched" && s !== "delivered";
+  }).length;
   const overdue = rows.filter(isOverdue).length;
-  const fills = rows.map(r => parseFloat(r.fillRate)).filter(n => !isNaN(n) && n > 0);
+  const fills   = rows.map(r => parseFloat(r.fillRate)).filter(n => !isNaN(n) && n > 0);
   const avgFill = fills.length ? (fills.reduce((a, b) => a + b, 0) / fills.length).toFixed(1) + "%" : "—";
-  document.getElementById("s-total").textContent = total.toLocaleString();
+  document.getElementById("s-total").textContent      = total.toLocaleString();
   document.getElementById("s-dispatched").textContent = dispatched.toLocaleString();
-  document.getElementById("s-pending").textContent = pending.toLocaleString();
-  document.getElementById("s-overdue").textContent = overdue.toLocaleString();
-  document.getElementById("s-fill").textContent = avgFill;
+  document.getElementById("s-pending").textContent    = pending.toLocaleString();
+  document.getElementById("s-overdue").textContent    = overdue.toLocaleString();
+  document.getElementById("s-fill").textContent       = avgFill;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -675,42 +698,60 @@ function showDetail(idx) {
   if (!r) return;
   document.getElementById("modal-po-no").textContent = r.poNo || "PO Details";
   const fields = [
-    ["Channel", r.channel || r._channel], ["Source/WH", r.sourceWh], ["Portal", r.portal], ["PO Date", r.poDate],
-    ["Location/WH", r.location], ["Status", r.status], ["Dispatched Date", r.dispatchedDate],
-    ["Expiry Date", r.expiryDate], ["Delivery Date", r.deliveryDate],
-    ["AWB No", r.awbNo], ["Courier", r.courier],
-    ["PO Qty", r.poQty], ["Inv Qty", r.invQty], ["Boxes", r.boxes],
-    ["Fill Rate", r.fillRate], ["PO Value", r.poValue],
-    ["Invoice Value", r.invoiceValue], ["Invoice No", r.invoiceNo],
-    ["Appt Date", r.apptDate], ["Appt Time", r.apptTime], ["Appt ID", r.apptId],
-    ["Remarks", r.remarks],
+    ["Channel",        r.channel],
+    ["Source/WH",      r.sourceWh],
+    ["Portal",         r.portal],
+    ["PO Date",        r.poDate],
+    ["Location/WH",    r.location],
+    ["Status",         r.status],
+    ["Dispatched Date",r.dispatchedDate],
+    ["Expiry Date",    r.expiryDate],
+    ["Delivery Date",  r.deliveryDate],
+    ["Inward Date",    r.inwardDate],
+    ["AWB No",         r.awbNo],
+    ["Courier",        r.courier],
+    ["PO Qty",         r.poQty],
+    ["Inv Qty",        r.invQty],
+    ["Boxes",          r.boxes],
+    ["Fill Rate",      r.fillRate],
+    ["PO Value",       r.poValue],
+    ["Invoice Value",  r.invoiceValue],
+    ["Invoice No",     r.invoiceNo],
+    ["Appt Date",      r.apptDate],
+    ["Appt Time",      r.apptTime],
+    ["Appt ID",        r.apptId],
+    ["Remarks",        r.remarks],
   ];
-  document.getElementById("modal-body").innerHTML = fields.filter(([,v]) => v).map(([l, v]) =>
-    `<div class="modal-field"><div class="mf-label">${l}</div><div class="mf-value">${esc(v)}</div></div>`
-  ).join("");
+  document.getElementById("modal-body").innerHTML = fields
+    .filter(([, v]) => v)
+    .map(([l, v]) => `<div class="modal-field"><div class="mf-label">${l}</div><div class="mf-value">${esc(v)}</div></div>`)
+    .join("");
   document.getElementById("detail-modal").classList.add("open");
 }
 
 function closeModal(e) {
-  if (e.target === document.getElementById("detail-modal")) document.getElementById("detail-modal").classList.remove("open");
+  if (e.target === document.getElementById("detail-modal")) {
+    document.getElementById("detail-modal").classList.remove("open");
+  }
 }
 
 // ═══════════════════════════════════════════════════════
 //  EXPORT
 // ═══════════════════════════════════════════════════════
 function exportCSV() {
-  const cols = ["channel","sourceWh","poNo","portal","poDate","location","status","dispatchedDate","expiryDate","deliveryDate","awbNo","courier","poQty","invQty","boxes","fillRate","poValue","invoiceValue","invoiceNo","remarks"];
+  const cols = ["channel","sourceWh","poNo","portal","poDate","location","status","dispatchedDate","expiryDate","deliveryDate","inwardDate","awbNo","courier","poQty","invQty","boxes","fillRate","poValue","invoiceValue","invoiceNo","remarks"];
   const header = cols.join(",");
   const rows = filteredRows.map(r => cols.map(c => `"${(r[c] || "").replace(/"/g, '""')}"`).join(","));
-  const csv = [header, ...rows].join("\n");
+  const csv  = [header, ...rows].join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
-  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-  a.download = "PO_Export_" + new Date().toISOString().slice(0,10) + ".csv";
+  const a    = document.createElement("a");
+  a.href     = URL.createObjectURL(blob);
+  a.download = "PO_Export_" + new Date().toISOString().slice(0, 10) + ".csv";
   a.click();
 }
 
 // ═══════════════════════════════════════════════════════
-//  UTILS
+//  UTILS — date normalisation
 // ═══════════════════════════════════════════════════════
 function normaliseDate(d) {
   if (!d || typeof d !== "string") return "";
@@ -718,7 +759,7 @@ function normaliseDate(d) {
   if (!d) return "";
   // Already YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
-  // DD-MM-YYYY e.g. 27-02-2023
+  // DD-MM-YYYY  e.g. 27-02-2023
   let m = d.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
   if (m) return `${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
   // D/M/YYYY or M/D/YYYY
@@ -727,30 +768,30 @@ function normaliseDate(d) {
     const p1 = parseInt(m[1]), p2 = parseInt(m[2]), yr = m[3];
     if (p1 > 12) return `${yr}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
     if (p2 > 12) return `${yr}-${m[1].padStart(2,"0")}-${m[2].padStart(2,"0")}`;
-    // ambiguous — Indian Sheets default is DD/MM/YYYY
+    // Ambiguous — Indian sheets default to DD/MM/YYYY
     return `${yr}-${m[1].padStart(2,"0")}-${m[2].padStart(2,"0")}`;
   }
   // 2-digit year D/M/YY
   m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
   if (m) {
-    const yr = parseInt(m[3]) > 50 ? "19"+m[3] : "20"+m[3];
+    const yr = parseInt(m[3]) > 50 ? "19" + m[3] : "20" + m[3];
     return `${yr}-${m[1].padStart(2,"0")}-${m[2].padStart(2,"0")}`;
   }
-  // Last resort native parse
+  // Last resort
   const p = new Date(d);
-  if (!isNaN(p)) return p.toISOString().slice(0,10);
+  if (!isNaN(p)) return p.toISOString().slice(0, 10);
   return d;
 }
 
 function showLoading(on) { document.getElementById("loading-bar").style.display = on ? "block" : "none"; }
-function showError(msg) { const e = document.getElementById("app-error"); e.textContent = msg; e.style.display = "block"; }
-function clearError() { document.getElementById("app-error").style.display = "none"; }
+function showError(msg)  { const e = document.getElementById("app-error"); e.textContent = msg; e.style.display = "block"; }
+function clearError()    { document.getElementById("app-error").style.display = "none"; }
 
 // ═══════════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════════
 if (!checkOAuthCallback()) {
-  // Show auth screen — Google Sign-In button renders automatically
+  // Google Sign-In button renders automatically via GSI script
 }
 </script>
 </body>
