@@ -967,23 +967,33 @@ function normaliseDate(d) {
   if (!d || typeof d !== "string") return "";
   d = d.trim();
   if (!d) return "";
+
+  // Already YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
-  let m = d.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
-  if (m) return `${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
-  m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (m) {
-    const p1 = parseInt(m[1]), p2 = parseInt(m[2]), yr = m[3];
-    if (p1 > 12) return `${yr}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
-    if (p2 > 12) return `${yr}-${m[1].padStart(2,"0")}-${m[2].padStart(2,"0")}`;
-    return `${yr}-${m[1].padStart(2,"0")}-${m[2].padStart(2,"0")}`;
+
+  // Helper: build ISO string from DD, MM, YY/YYYY parts
+  function iso(day, mon, yr) {
+    const y = yr.length === 2 ? (parseInt(yr) > 50 ? "19" + yr : "20" + yr) : yr;
+    return `${y}-${mon.padStart(2,"0")}-${day.padStart(2,"0")}`;
   }
-  m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
-  if (m) {
-    const yr = parseInt(m[3]) > 50 ? "19" + m[3] : "20" + m[3];
-    return `${yr}-${m[1].padStart(2,"0")}-${m[2].padStart(2,"0")}`;
-  }
+
+  let m;
+  // DD-MM-YYYY or DD-MM-YY
+  m = d.match(/^(\d{1,2})-(\d{1,2})-(\d{2,4})$/);
+  if (m) return iso(m[1], m[2], m[3]);
+
+  // DD/MM/YYYY or DD/MM/YY (always DD/MM for Indian sheets)
+  m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (m) return iso(m[1], m[2], m[3]);
+
+  // DD.MM.YYYY or DD.MM.YY  (e.g. 03.04.26 from Google Sheets)
+  m = d.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
+  if (m) return iso(m[1], m[2], m[3]);
+
+  // Last resort: JS Date() — intentionally last as it assumes MM/DD
   const p = new Date(d);
   if (!isNaN(p)) return p.toISOString().slice(0, 10);
+
   return d;
 }
 
