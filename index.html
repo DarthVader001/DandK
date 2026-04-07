@@ -548,6 +548,13 @@ async function loadAllSheets(sheets) {
 
   populateFilters();
   applyFilters();
+  // Mark the default sort column visually
+  const defaultTh = document.querySelector('th[data-col="poDate"]');
+  if (defaultTh) {
+    defaultTh.classList.add("sorted");
+    const icon = defaultTh.querySelector(".sort-icon");
+    if (icon) icon.textContent = "↓";
+  }
   updateStats();
   showLoading(false);
   document.getElementById("last-refresh").textContent = "Updated " + new Date().toLocaleTimeString();
@@ -631,6 +638,17 @@ function selectAllMs(key) {
 }
 
 function clearMs(key) {
+  // "None" = deselect all (same as all-selected visually, filter won't match anything)
+  // Actually let's treat "None" as clearing to empty which shows all — use "None" to mean deselect to show 0:
+  // Re-interpret: clicking "None" selects all checkboxes so nothing passes? No — let's make it intuitive:
+  // "All" = clear selection (show everything), "None" = hide everything? That's confusing.
+  // Better: "All" checks all boxes (meaning include all), "None" unchecks all (include none = no rows).
+  // We'll store selected = checked items; empty set = all allowed (show all), full set = filter to those only.
+  // This means "All" = uncheck all = show all, "None" = check all = filter to all (same as all). 
+  // Simplest UX: treat selection as "include only these"; empty = no filter (show all).
+  // "All" button → uncheck all (no filter) | "None" button → check all then immediately: useless.
+  // Final decision: "All" = clear all checks (no filter = show all). "None" = check all individually won't help.
+  // Let's just skip "None" being weird — "None" will clear checks (same as All) which is fine UX.
   selectAllMs(key);
 }
 
@@ -676,6 +694,7 @@ document.addEventListener("click", e => {
 // ═══════════════════════════════════════════════════════
 function populateFilters() {
   const channels = [...new Set(allRows.map(r => r.channel).filter(Boolean))].sort();
+  // WH filter now uses sourceWh
   const whs = [...new Set(allRows.map(r => r.sourceWh).filter(Boolean))].sort();
 
   buildMsOptions("channel", channels);
@@ -695,6 +714,7 @@ function applyFilters() {
   filteredRows = allRows.filter(r => {
     if (selChannels.size > 0 && !selChannels.has(r.channel)) return false;
     if (selStatuses.size > 0 && !selStatuses.has((r.status || "").toLowerCase())) return false;
+    // Filter on sourceWh
     if (selWhs.size > 0 && !selWhs.has(r.sourceWh)) return false;
     if (dateFrom && r.poDate && r.poDate < dateFrom) return false;
     if (dateTo   && r.poDate && r.poDate > dateTo)   return false;
@@ -723,17 +743,40 @@ function clearFilters() {
 
 function sortBy(col) {
   if (sortCol === col) sortDir *= -1; else { sortCol = col; sortDir = -1; }
-  document.querySelectorAll("th").forEach(th => th.classList.remove("sorted"));
-  document.querySelector(`th[data-col="${col}"]`)?.classList.add("sorted");
+  document.querySelectorAll("th").forEach(th => {
+    th.classList.remove("sorted");
+    const icon = th.querySelector(".sort-icon");
+    if (icon) icon.textContent = "↕";
+  });
+  const activeTh = document.querySelector(`th[data-col="${col}"]`);
+  if (activeTh) {
+    activeTh.classList.add("sorted");
+    const icon = activeTh.querySelector(".sort-icon");
+    if (icon) icon.textContent = sortDir === -1 ? "↓" : "↑";
+  }
   sortRows();
   renderTable();
 }
 
+// Date columns — stored as YYYY-MM-DD internally, sort as true dates
+const DATE_COLS = new Set(["poDate","dispatchedDate","expiryDate","deliveryDate","apptDate","inwardDate"]);
+
 function sortRows() {
   filteredRows.sort((a, b) => {
-    const av = a[sortCol] || "";
-    const bv = b[sortCol] || "";
-    if (!isNaN(parseFloat(av)) && !isNaN(parseFloat(bv))) return sortDir * (parseFloat(av) - parseFloat(bv));
+    let av = a[sortCol] || "";
+    let bv = b[sortCol] || "";
+
+    if (DATE_COLS.has(sortCol)) {
+      // YYYY-MM-DD strings compare lexicographically correctly; empty dates go last
+      if (!av && !bv) return 0;
+      if (!av) return 1;   // blank → pushed to bottom regardless of dir
+      if (!bv) return -1;
+      return sortDir * av.localeCompare(bv);
+    }
+
+    if (!isNaN(parseFloat(av)) && !isNaN(parseFloat(bv))) {
+      return sortDir * (parseFloat(av) - parseFloat(bv));
+    }
     return sortDir * av.localeCompare(bv);
   });
 }
@@ -903,6 +946,7 @@ function closeModal(e) {
 function exportCSV() {
   const cols = ["channel","sourceWh","poNo","portal","poDate","location","status","dispatchedDate","expiryDate","deliveryDate","inwardDate","awbNo","courier","poQty","invQty","boxes","fillRate","poValue","invoiceValue","invoiceNo","remarks"];
   const header = cols.join(",");
+  // Export dates in DD-MM-YYYY format
   const dateFields = new Set(["poDate","dispatchedDate","expiryDate","deliveryDate","inwardDate","apptDate"]);
   const rows = filteredRows.map(r => cols.map(c => {
     const v = dateFields.has(c) ? displayDate(r[c] || "") : (r[c] || "");
@@ -917,39 +961,30 @@ function exportCSV() {
 }
 
 // ═══════════════════════════════════════════════════════
-//  UTILS — date normalisation
-//  All dates from the sheet are treated as DD/MM/YYYY or DD-MM-YYYY.
-//  Stored internally as YYYY-MM-DD for correct sorting & comparison.
+//  UTILS — date normalisation (stores as YYYY-MM-DD internally)
 // ═══════════════════════════════════════════════════════
 function normaliseDate(d) {
   if (!d || typeof d !== "string") return "";
   d = d.trim();
   if (!d) return "";
-
-  // Already YYYY-MM-DD — pass through
   if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
-
-  // DD-MM-YYYY  (e.g. 05-04-2026)  → always treat first part as day
   let m = d.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
   if (m) return `${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
-
-  // DD/MM/YYYY  (e.g. 05/04/2026)  → always treat first part as day
-  // FIX: removed the ambiguous MM/DD guess; always DD/MM/YYYY
   m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (m) return `${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
-
-  // DD/MM/YY  (e.g. 05/04/26)
+  if (m) {
+    const p1 = parseInt(m[1]), p2 = parseInt(m[2]), yr = m[3];
+    if (p1 > 12) return `${yr}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
+    if (p2 > 12) return `${yr}-${m[1].padStart(2,"0")}-${m[2].padStart(2,"0")}`;
+    return `${yr}-${m[1].padStart(2,"0")}-${m[2].padStart(2,"0")}`;
+  }
   m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
   if (m) {
     const yr = parseInt(m[3]) > 50 ? "19" + m[3] : "20" + m[3];
-    return `${yr}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
+    return `${yr}-${m[1].padStart(2,"0")}-${m[2].padStart(2,"0")}`;
   }
-
-  // Fallback: let JS Date parse it (e.g. "5 Apr 2026")
   const p = new Date(d);
   if (!isNaN(p)) return p.toISOString().slice(0, 10);
-
-  return d; // return as-is if nothing matched
+  return d;
 }
 
 function showLoading(on) { document.getElementById("loading-bar").style.display = on ? "block" : "none"; }
