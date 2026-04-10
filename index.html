@@ -402,7 +402,7 @@ function normaliseStatus(raw) {
   const s = (raw || "").trim().toLowerCase();
 
   // Blank → Conversion Pending
-  if (!s) return "Conversion Pending";
+  
 
   // "sent for approval" → Approval Pending
   if (s === "sent for approval") return "Approval Pending";
