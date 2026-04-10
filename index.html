@@ -334,12 +334,11 @@
               <th onclick="sortBy('fillRate')" data-col="fillRate">Fill % <span class="sort-icon">↕</span></th>
               <th onclick="sortBy('poQty')" data-col="poQty">PO Qty <span class="sort-icon">↕</span></th>
               <th onclick="sortBy('invQty')" data-col="invQty">Inv Qty <span class="sort-icon">↕</span></th>
-              <th onclick="sortBy('invoiceValue')" data-col="invoiceValue">Inv Value <span class="sort-icon">↕</span></th>
               <th>Remarks</th>
             </tr>
           </thead>
           <tbody id="po-tbody">
-            <tr><td colspan="14" class="center-msg"><div class="spinner"></div>Loading PO data…</td></tr>
+            <tr><td colspan="13" class="center-msg"><div class="spinner"></div>Loading PO data…</td></tr>
           </tbody>
         </table>
       </div>
@@ -395,6 +394,43 @@ const COL_MAP = {
 };
 
 // ═══════════════════════════════════════════════════════
+//  STATUS NORMALISATION
+//  Called once per row after sheet data is parsed.
+//  The raw value from the sheet → canonical display value.
+// ═══════════════════════════════════════════════════════
+function normaliseStatus(raw) {
+  const s = (raw || "").trim().toLowerCase();
+
+  // Blank → Conversion Pending
+  if (!s) return "Conversion Pending";
+
+  // "sent for approval" → Approval Pending
+  if (s === "sent for approval") return "Approval Pending";
+
+  // "so pending" / "s.o. pending" / "so. pending" → Process Pending
+  if (s === "so pending" || s === "s.o. pending" || s === "so. pending") return "Process Pending";
+
+  // Plain "pending" (no qualifier) → Conversion Pending
+  if (s === "pending") return "Conversion Pending";
+
+  // Already-canonical values — return with proper casing
+  const canonical = {
+    "conversion pending": "Conversion Pending",
+    "approval pending":   "Approval Pending",
+    "process pending":    "Process Pending",
+    "dispatch pending":   "Dispatch Pending",
+    "dispatched":         "Dispatched",
+    "delivered":          "Delivered",
+    "hold":               "Hold",
+    "rto":                "RTO",
+  };
+  if (canonical[s]) return canonical[s];
+
+  // Fallback: return original with first-letter capitalisation
+  return raw.trim().replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// ═══════════════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════════════
 let accessToken = null;
@@ -408,7 +444,7 @@ let sortDir = -1;
 // Multi-select state: maps filter key → Set of selected values (empty = all)
 const msState = { channel: new Set(), status: new Set(), wh: new Set() };
 const STATUS_OPTIONS = [
-  "Pending","Conversion Pending","Approval Pending","Process Pending",
+  "Conversion Pending","Approval Pending","Process Pending",
   "Dispatch Pending","Dispatched","Delivered","Hold","RTO"
 ];
 
@@ -590,6 +626,10 @@ async function fetchSheet(sheet) {
     obj.apptDate       = normaliseDate(obj.apptDate);
     obj.inwardDate     = normaliseDate(obj.inwardDate);
     obj.channel = sheet.name;
+
+    // Normalise status
+    obj.status = normaliseStatus(obj.status);
+
     return obj;
   }).filter(r => r.poNo || r.channel);
 }
@@ -638,17 +678,6 @@ function selectAllMs(key) {
 }
 
 function clearMs(key) {
-  // "None" = deselect all (same as all-selected visually, filter won't match anything)
-  // Actually let's treat "None" as clearing to empty which shows all — use "None" to mean deselect to show 0:
-  // Re-interpret: clicking "None" selects all checkboxes so nothing passes? No — let's make it intuitive:
-  // "All" = clear selection (show everything), "None" = hide everything? That's confusing.
-  // Better: "All" checks all boxes (meaning include all), "None" unchecks all (include none = no rows).
-  // We'll store selected = checked items; empty set = all allowed (show all), full set = filter to those only.
-  // This means "All" = uncheck all = show all, "None" = check all = filter to all (same as all). 
-  // Simplest UX: treat selection as "include only these"; empty = no filter (show all).
-  // "All" button → uncheck all (no filter) | "None" button → check all then immediately: useless.
-  // Final decision: "All" = clear all checks (no filter = show all). "None" = check all individually won't help.
-  // Let's just skip "None" being weird — "None" will clear checks (same as All) which is fine UX.
   selectAllMs(key);
 }
 
@@ -694,7 +723,6 @@ document.addEventListener("click", e => {
 // ═══════════════════════════════════════════════════════
 function populateFilters() {
   const channels = [...new Set(allRows.map(r => r.channel).filter(Boolean))].sort();
-  // WH filter now uses sourceWh
   const whs = [...new Set(allRows.map(r => r.sourceWh).filter(Boolean))].sort();
 
   buildMsOptions("channel", channels);
@@ -714,7 +742,6 @@ function applyFilters() {
   filteredRows = allRows.filter(r => {
     if (selChannels.size > 0 && !selChannels.has(r.channel)) return false;
     if (selStatuses.size > 0 && !selStatuses.has((r.status || "").toLowerCase())) return false;
-    // Filter on sourceWh
     if (selWhs.size > 0 && !selWhs.has(r.sourceWh)) return false;
     if (dateFrom && r.poDate && r.poDate < dateFrom) return false;
     if (dateTo   && r.poDate && r.poDate > dateTo)   return false;
@@ -758,7 +785,6 @@ function sortBy(col) {
   renderTable();
 }
 
-// Date columns — stored as YYYY-MM-DD internally, sort as true dates
 const DATE_COLS = new Set(["poDate","dispatchedDate","expiryDate","deliveryDate","apptDate","inwardDate"]);
 
 function sortRows() {
@@ -767,9 +793,8 @@ function sortRows() {
     let bv = b[sortCol] || "";
 
     if (DATE_COLS.has(sortCol)) {
-      // YYYY-MM-DD strings compare lexicographically correctly; empty dates go last
       if (!av && !bv) return 0;
-      if (!av) return 1;   // blank → pushed to bottom regardless of dir
+      if (!av) return 1;
       if (!bv) return -1;
       return sortDir * av.localeCompare(bv);
     }
@@ -792,18 +817,18 @@ function isOverdue(row) {
 
 function badgeClass(status) {
   const s = (status || "").toLowerCase().trim();
-  if (s === "pending")             return "badge-pending";
-  if (s === "conversion pending")  return "badge-conversion";
-  if (s === "approval pending")    return "badge-approval";
-  if (s === "process pending")     return "badge-process";
-  if (s === "dispatch pending")    return "badge-dispatch";
-  if (s === "dispatched")          return "badge-dispatched";
-  if (s === "delivered")           return "badge-delivered";
+  if (s === "conversion pending") return "badge-conversion";
+  if (s === "approval pending")   return "badge-approval";
+  if (s === "process pending")    return "badge-process";
+  if (s === "dispatch pending")   return "badge-dispatch";
+  if (s === "dispatched")         return "badge-dispatched";
+  if (s === "delivered")          return "badge-delivered";
   if (s === "hold" || s === "rto") return "badge-hold";
+  // Generic "pending" fallback (shouldn't appear after normalisation but just in case)
+  if (s === "pending")            return "badge-pending";
   return "badge-default";
 }
 
-// ── Display date as DD-MM-YYYY (stored internally as YYYY-MM-DD) ──
 function displayDate(d) {
   if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return d || "";
   const [y, m, day] = d.split("-");
@@ -816,7 +841,7 @@ function renderTable() {
   const page  = filteredRows.slice(start, start + PAGE_SIZE);
 
   if (page.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="14" class="center-msg">No POs match your filters.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="13" class="center-msg">No POs match your filters.</td></tr>`;
     document.getElementById("row-count").textContent = "0 rows";
     renderPagination();
     return;
@@ -841,7 +866,6 @@ function renderTable() {
       <td style="${frColor}; font-weight:500;">${fr}</td>
       <td>${esc(r.poQty)}</td>
       <td>${esc(r.invQty)}</td>
-      <td>${esc(r.invoiceValue)}</td>
       <td style="max-width:180px; overflow:hidden; text-overflow:ellipsis;" title="${esc(r.remarks)}">${esc(r.remarks)}</td>
     </tr>`;
   }).join("");
@@ -944,9 +968,8 @@ function closeModal(e) {
 //  EXPORT
 // ═══════════════════════════════════════════════════════
 function exportCSV() {
-  const cols = ["channel","sourceWh","poNo","portal","poDate","location","status","dispatchedDate","expiryDate","deliveryDate","inwardDate","awbNo","courier","poQty","invQty","boxes","fillRate","poValue","invoiceValue","invoiceNo","remarks"];
+  const cols = ["channel","sourceWh","poNo","portal","poDate","location","status","dispatchedDate","expiryDate","deliveryDate","inwardDate","awbNo","courier","poQty","invQty","boxes","fillRate","poValue","invoiceNo","remarks"];
   const header = cols.join(",");
-  // Export dates in DD-MM-YYYY format
   const dateFields = new Set(["poDate","dispatchedDate","expiryDate","deliveryDate","inwardDate","apptDate"]);
   const rows = filteredRows.map(r => cols.map(c => {
     const v = dateFields.has(c) ? displayDate(r[c] || "") : (r[c] || "");
@@ -961,36 +984,30 @@ function exportCSV() {
 }
 
 // ═══════════════════════════════════════════════════════
-//  UTILS — date normalisation (stores as YYYY-MM-DD internally)
+//  UTILS — date normalisation
 // ═══════════════════════════════════════════════════════
 function normaliseDate(d) {
   if (!d || typeof d !== "string") return "";
   d = d.trim();
   if (!d) return "";
 
-  // Already YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
 
-  // Helper: build ISO string from DD, MM, YY/YYYY parts
   function iso(day, mon, yr) {
     const y = yr.length === 2 ? (parseInt(yr) > 50 ? "19" + yr : "20" + yr) : yr;
     return `${y}-${mon.padStart(2,"0")}-${day.padStart(2,"0")}`;
   }
 
   let m;
-  // DD-MM-YYYY or DD-MM-YY
   m = d.match(/^(\d{1,2})-(\d{1,2})-(\d{2,4})$/);
   if (m) return iso(m[1], m[2], m[3]);
 
-  // DD/MM/YYYY or DD/MM/YY (always DD/MM for Indian sheets)
   m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if (m) return iso(m[1], m[2], m[3]);
 
-  // DD.MM.YYYY or DD.MM.YY  (e.g. 03.04.26 from Google Sheets)
   m = d.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
   if (m) return iso(m[1], m[2], m[3]);
 
-  // Last resort: JS Date() — intentionally last as it assumes MM/DD
   const p = new Date(d);
   if (!isNaN(p)) return p.toISOString().slice(0, 10);
 
