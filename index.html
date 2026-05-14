@@ -309,6 +309,9 @@
 
       <input type="date" id="f-date-from" onchange="applyFilters()" title="PO date from">
       <input type="date" id="f-date-to" onchange="applyFilters()" title="PO date to">
+      <span class="filter-label">Appt Date:</span>
+      <input type="date" id="f-appt-from" onchange="applyFilters()" title="Appointment date from">
+      <input type="date" id="f-appt-to" onchange="applyFilters()" title="Appointment date to">
       <button class="btn-clear" onclick="clearFilters()">Clear</button>
     </div>
 
@@ -334,11 +337,12 @@
               <th onclick="sortBy('fillRate')" data-col="fillRate">Fill % <span class="sort-icon">↕</span></th>
               <th onclick="sortBy('poQty')" data-col="poQty">PO Qty <span class="sort-icon">↕</span></th>
               <th onclick="sortBy('invQty')" data-col="invQty">Inv Qty <span class="sort-icon">↕</span></th>
+              <th onclick="sortBy('apptDate')" data-col="apptDate">Appt Date <span class="sort-icon">↕</span></th>
               <th>Remarks</th>
             </tr>
           </thead>
           <tbody id="po-tbody">
-            <tr><td colspan="13" class="center-msg"><div class="spinner"></div>Loading PO data…</td></tr>
+            <tr><td colspan="14" class="center-msg"><div class="spinner"></div>Loading PO data…</td></tr>
           </tbody>
         </table>
       </div>
@@ -740,9 +744,11 @@ function populateFilters() {
 }
 
 function applyFilters() {
-  const search   = document.getElementById("f-search").value.toLowerCase();
-  const dateFrom = document.getElementById("f-date-from").value;
-  const dateTo   = document.getElementById("f-date-to").value;
+  const search    = document.getElementById("f-search").value.toLowerCase();
+  const dateFrom  = document.getElementById("f-date-from").value;
+  const dateTo    = document.getElementById("f-date-to").value;
+  const apptFrom  = document.getElementById("f-appt-from").value;
+  const apptTo    = document.getElementById("f-appt-to").value;
 
   const selChannels = msState.channel;
   const selStatuses = new Set([...msState.status].map(s => s.toLowerCase()));
@@ -754,6 +760,8 @@ function applyFilters() {
     if (selWhs.size > 0 && !selWhs.has(r.sourceWh)) return false;
     if (dateFrom && r.poDate && r.poDate < dateFrom) return false;
     if (dateTo   && r.poDate && r.poDate > dateTo)   return false;
+    if (apptFrom && r.apptDate && r.apptDate < apptFrom) return false;
+    if (apptTo   && r.apptDate && r.apptDate > apptTo)   return false;
     if (search) {
       const haystack = [r.poNo, r.awbNo, r.channel, r.sourceWh, r.location, r.status, r.courier, r.portal].join(" ").toLowerCase();
       if (!haystack.includes(search)) return false;
@@ -768,7 +776,7 @@ function applyFilters() {
 }
 
 function clearFilters() {
-  ["f-search","f-date-from","f-date-to"].forEach(id => document.getElementById(id).value = "");
+  ["f-search","f-date-from","f-date-to","f-appt-from","f-appt-to"].forEach(id => document.getElementById(id).value = "");
   ["channel","status","wh"].forEach(key => {
     msState[key].clear();
     document.querySelectorAll(`#ms-${key}-opts input[type=checkbox]`).forEach(cb => cb.checked = false);
@@ -850,7 +858,7 @@ function renderTable() {
   const page  = filteredRows.slice(start, start + PAGE_SIZE);
 
   if (page.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="13" class="center-msg">No POs match your filters.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="14" class="center-msg">No POs match your filters.</td></tr>`;
     document.getElementById("row-count").textContent = "0 rows";
     renderPagination();
     return;
@@ -875,6 +883,7 @@ function renderTable() {
       <td style="${frColor}; font-weight:500;">${fr}</td>
       <td>${esc(r.poQty)}</td>
       <td>${esc(r.invQty)}</td>
+      <td>${esc(displayDate(r.apptDate))}</td>
       <td style="max-width:180px; overflow:hidden; text-overflow:ellipsis;" title="${esc(r.remarks)}">${esc(r.remarks)}</td>
     </tr>`;
   }).join("");
@@ -977,7 +986,7 @@ function closeModal(e) {
 //  EXPORT
 // ═══════════════════════════════════════════════════════
 function exportCSV() {
-  const cols = ["channel","sourceWh","poNo","portal","poDate","location","status","dispatchedDate","expiryDate","deliveryDate","inwardDate","awbNo","courier","poQty","invQty","boxes","fillRate","poValue","invoiceNo","remarks"];
+  const cols = ["channel","sourceWh","poNo","portal","poDate","location","status","dispatchedDate","expiryDate","deliveryDate","inwardDate","awbNo","courier","poQty","invQty","boxes","fillRate","poValue","invoiceNo","apptDate","apptTime","apptId","remarks"];
   const header = cols.join(",");
   const dateFields = new Set(["poDate","dispatchedDate","expiryDate","deliveryDate","inwardDate","apptDate"]);
   const rows = filteredRows.map(r => cols.map(c => {
