@@ -32,22 +32,6 @@
   .auth-card p { color: var(--muted); font-size: 13px; margin-bottom: 1.5rem; line-height: 1.5; }
   .auth-card .brand { font-size: 28px; margin-bottom: 1rem; }
 
-  /* ── SETUP SCREEN ── */
-  #setup-screen { display: none; max-width: 700px; margin: 0 auto; padding: 2rem 1rem; }
-  #setup-screen h2 { font-size: 18px; font-weight: 600; margin-bottom: 0.5rem; }
-  #setup-screen p { color: var(--muted); font-size: 13px; margin-bottom: 1.5rem; line-height: 1.6; }
-  .sheet-entry { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 0.75rem; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .sheet-entry input { width: 100%; padding: 7px 10px; border: 0.5px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--bg); color: var(--text); }
-  .sheet-entry input:focus { outline: none; border-color: var(--blue); }
-  .sheet-entry input::placeholder { color: var(--muted); }
-  .sheet-entry label { font-size: 11px; color: var(--muted); display: block; margin-bottom: 3px; }
-  .btn-add { background: none; border: 0.5px dashed var(--border); border-radius: var(--radius); padding: 0.6rem; width: 100%; color: var(--muted); font-size: 13px; cursor: pointer; margin-bottom: 1rem; }
-  .btn-add:hover { background: var(--bg); }
-  .btn-primary { background: var(--text); color: #fff; border: none; border-radius: 8px; padding: 0.65rem 1.5rem; font-size: 14px; font-weight: 500; cursor: pointer; display: block; width: 100%; }
-  .btn-primary:hover { opacity: 0.85; }
-  .btn-remove { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 18px; line-height: 1; padding: 2px 6px; float: right; }
-  .tip { background: var(--blue-bg); border-radius: 8px; padding: 0.75rem 1rem; font-size: 12px; color: var(--blue-text); margin-bottom: 1rem; line-height: 1.6; }
-
   /* ── MAIN APP ── */
   #app { display: none; }
   header { background: var(--surface); border-bottom: 0.5px solid var(--border); padding: 0 1.5rem; height: 52px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
@@ -55,7 +39,6 @@
   .header-right { display: flex; align-items: center; gap: 10px; }
   .btn-sm { background: none; border: 0.5px solid var(--border); border-radius: 6px; padding: 5px 12px; font-size: 12px; cursor: pointer; color: var(--text); }
   .btn-sm:hover { background: var(--bg); }
-  .btn-sm.active { background: var(--text); color: #fff; border-color: var(--text); }
 
   main { max-width: 1400px; margin: 0 auto; padding: 1.25rem 1.5rem; }
 
@@ -188,7 +171,7 @@
   <div class="auth-card">
     <div class="brand">📦</div>
     <h1>PO Tracker</h1>
-    <p>Sign in with your Google account to load your PO sheets. Your sheet access never leaves your account.</p>
+    <p>Sign in with your Google account to load your PO sheets.</p>
     <div id="g_id_onload"
       data-client_id="463035787922-tpie873ujm0b03cousnoan1np4t7jhvs.apps.googleusercontent.com"
       data-callback="handleCredential"
@@ -203,27 +186,7 @@
       data-logo_alignment="left"
       data-width="280">
     </div>
-    <p style="margin-top:1rem; font-size:11px; color:var(--muted);">First time? After signing in you'll configure which sheets to load.</p>
   </div>
-</div>
-
-<!-- ══════════════════ SETUP SCREEN ══════════════════ -->
-<div id="setup-screen">
-  <h2>Configure your sheets</h2>
-  <p>Add each channel's Google Sheet below. You'll find the Sheet ID in the URL:<br>
-  <code style="font-size:12px; background:var(--bg); padding:2px 6px; border-radius:4px;">docs.google.com/spreadsheets/d/<strong>SHEET_ID_HERE</strong>/edit</code></p>
-
-  <div class="tip">
-    ℹ️ The tab name must match exactly what's in your Google Sheet (case-sensitive). If a sheet has multiple tabs, you can add the same Sheet ID multiple times with different tab names.
-  </div>
-
-  <div id="sheet-entries"></div>
-  <button class="btn-add" onclick="addSheetEntry()">+ Add another sheet / tab</button>
-
-  <div id="setup-error" class="error-msg" style="display:none;"></div>
-
-  <button class="btn-primary" onclick="saveAndLoad()">Load my PO data →</button>
-  <p style="font-size:11px; color:var(--muted); margin-top:0.75rem; text-align:center;">Your configuration is saved locally in this browser only.</p>
 </div>
 
 <!-- ══════════════════ MAIN APP ══════════════════ -->
@@ -235,7 +198,6 @@
       <span id="last-refresh" style="font-size:11px; color:var(--muted);"></span>
       <button class="btn-sm" onclick="refreshData()">↻ Refresh</button>
       <button class="btn-export" onclick="exportCSV()">↓ Export CSV</button>
-      <button class="btn-sm" onclick="openSetup()" title="Edit sheets">⚙ Sheets</button>
       <button class="btn-sm" onclick="signOut()">Sign out</button>
     </div>
   </header>
@@ -365,75 +327,115 @@
 
 <script>
 // ═══════════════════════════════════════════════════════
+//  HARDCODED SHEET CONFIGURATION
+//  hrow: 1 = headers in row 1, 2 = headers in row 2
+// ═══════════════════════════════════════════════════════
+const SHEETS_CONFIG = [
+  // ── Sheet 1 (header row 1) ──
+  { id: "1zq9bV0LM0EDDxAVIwMOaqWnRGJ-T2mfqyHP0-YHQqi4", tab: "Blinkit",           name: "Blinkit",           hrow: 1 },
+  { id: "1zq9bV0LM0EDDxAVIwMOaqWnRGJ-T2mfqyHP0-YHQqi4", tab: "Purplle",           name: "Purplle",           hrow: 1 },
+  { id: "1zq9bV0LM0EDDxAVIwMOaqWnRGJ-T2mfqyHP0-YHQqi4", tab: "Zepto",             name: "Zepto",             hrow: 1 },
+  { id: "1zq9bV0LM0EDDxAVIwMOaqWnRGJ-T2mfqyHP0-YHQqi4", tab: "Swiggy_Instamart",  name: "Swiggy Instamart",  hrow: 1 },
+  { id: "1zq9bV0LM0EDDxAVIwMOaqWnRGJ-T2mfqyHP0-YHQqi4", tab: "Mnow",              name: "Mnow",              hrow: 1 },
+  { id: "1zq9bV0LM0EDDxAVIwMOaqWnRGJ-T2mfqyHP0-YHQqi4", tab: "Myntra",            name: "Myntra",            hrow: 1 },
+
+  // ── Sheet 2 (header row 1) ──
+  { id: "1bNvNDvI55ZIqU0GAPthhvHcOLaHyAw1ShI7wvPItKPk", tab: "NYKAA-Kolkata",     name: "NYKAA-Kolkata",     hrow: 1 },
+  { id: "1bNvNDvI55ZIqU0GAPthhvHcOLaHyAw1ShI7wvPItKPk", tab: "Nykaa-GGNB2B",      name: "Nykaa-GGNB2B",      hrow: 1 },
+  { id: "1bNvNDvI55ZIqU0GAPthhvHcOLaHyAw1ShI7wvPItKPk", tab: "Nykaa-MUM",         name: "Nykaa-MUM",         hrow: 1 },
+  { id: "1bNvNDvI55ZIqU0GAPthhvHcOLaHyAw1ShI7wvPItKPk", tab: "PLGT",              name: "PLGT",              hrow: 1 },
+  { id: "1bNvNDvI55ZIqU0GAPthhvHcOLaHyAw1ShI7wvPItKPk", tab: "FSN-B",             name: "FSN-B",             hrow: 1 },
+  { id: "1bNvNDvI55ZIqU0GAPthhvHcOLaHyAw1ShI7wvPItKPk", tab: "Suprtstore",        name: "Suprtstore",        hrow: 1 },
+  { id: "1bNvNDvI55ZIqU0GAPthhvHcOLaHyAw1ShI7wvPItKPk", tab: "ShopperStop",       name: "ShopperStop",       hrow: 1 },
+  { id: "1bNvNDvI55ZIqU0GAPthhvHcOLaHyAw1ShI7wvPItKPk", tab: "Dabur",             name: "Dabur",             hrow: 1 },
+  { id: "1bNvNDvI55ZIqU0GAPthhvHcOLaHyAw1ShI7wvPItKPk", tab: "Health&Glow",       name: "Health&Glow",       hrow: 1 },
+  { id: "1bNvNDvI55ZIqU0GAPthhvHcOLaHyAw1ShI7wvPItKPk", tab: "Mumuso",            name: "Mumuso",            hrow: 1 },
+  { id: "1bNvNDvI55ZIqU0GAPthhvHcOLaHyAw1ShI7wvPItKPk", tab: "Avenue Ecomm.",     name: "Avenue Ecomm.",     hrow: 1 },
+  { id: "1bNvNDvI55ZIqU0GAPthhvHcOLaHyAw1ShI7wvPItKPk", tab: "Az - Now PO",       name: "Amazon Now",        hrow: 1 },
+  { id: "1bNvNDvI55ZIqU0GAPthhvHcOLaHyAw1ShI7wvPItKPk", tab: "Amazon FBA",        name: "Amazon FBA",        hrow: 1 },
+  { id: "1bNvNDvI55ZIqU0GAPthhvHcOLaHyAw1ShI7wvPItKPk", tab: "Flipkart",          name: "Flipkart",          hrow: 1 },
+  { id: "1bNvNDvI55ZIqU0GAPthhvHcOLaHyAw1ShI7wvPItKPk", tab: "GT",                name: "GT",                hrow: 1 },
+  { id: "1bNvNDvI55ZIqU0GAPthhvHcOLaHyAw1ShI7wvPItKPk", tab: "Flipkart Hyperlocal", name: "Flipkart Hyperlocal", hrow: 1 },
+
+  // ── Sheet 3 (header row 2) ──
+  { id: "1IdsK06m-QzRvRrkpmpCvGe7ITh6UPl13wlflxNrSc54", tab: "Blinkit",             name: "Blinkit (S3)",             hrow: 2 },
+  { id: "1IdsK06m-QzRvRrkpmpCvGe7ITh6UPl13wlflxNrSc54", tab: "Purplle",             name: "Purplle (S3)",             hrow: 2 },
+  { id: "1IdsK06m-QzRvRrkpmpCvGe7ITh6UPl13wlflxNrSc54", tab: "Zepto",               name: "Zepto (S3)",               hrow: 2 },
+  { id: "1IdsK06m-QzRvRrkpmpCvGe7ITh6UPl13wlflxNrSc54", tab: "Swiggy Instamart",    name: "Swiggy Instamart (S3)",    hrow: 2 },
+  { id: "1IdsK06m-QzRvRrkpmpCvGe7ITh6UPl13wlflxNrSc54", tab: "Myntra Mnow",         name: "Myntra Mnow (S3)",         hrow: 2 },
+  { id: "1IdsK06m-QzRvRrkpmpCvGe7ITh6UPl13wlflxNrSc54", tab: "Myntra SJIT",         name: "Myntra SJIT (S3)",         hrow: 2 },
+  { id: "1IdsK06m-QzRvRrkpmpCvGe7ITh6UPl13wlflxNrSc54", tab: "Smytten",             name: "Smytten (S3)",             hrow: 2 },
+  { id: "1IdsK06m-QzRvRrkpmpCvGe7ITh6UPl13wlflxNrSc54", tab: "Amazon Now",          name: "Amazon Now (S3)",          hrow: 2 },
+  { id: "1IdsK06m-QzRvRrkpmpCvGe7ITh6UPl13wlflxNrSc54", tab: "Nykaa",               name: "Nykaa (S3)",               hrow: 2 },
+  { id: "1IdsK06m-QzRvRrkpmpCvGe7ITh6UPl13wlflxNrSc54", tab: "PLGT",                name: "PLGT (S3)",                hrow: 2 },
+  { id: "1IdsK06m-QzRvRrkpmpCvGe7ITh6UPl13wlflxNrSc54", tab: "FSNB",                name: "FSNB (S3)",                hrow: 2 },
+  { id: "1IdsK06m-QzRvRrkpmpCvGe7ITh6UPl13wlflxNrSc54", tab: "FSND",                name: "FSND (S3)",                hrow: 2 },
+  { id: "1IdsK06m-QzRvRrkpmpCvGe7ITh6UPl13wlflxNrSc54", tab: "ShopperStop",         name: "ShopperStop (S3)",         hrow: 2 },
+  { id: "1IdsK06m-QzRvRrkpmpCvGe7ITh6UPl13wlflxNrSc54", tab: "Mumuso",              name: "Mumuso (S3)",              hrow: 2 },
+  { id: "1IdsK06m-QzRvRrkpmpCvGe7ITh6UPl13wlflxNrSc54", tab: "Dabur",               name: "Dabur (S3)",               hrow: 2 },
+  { id: "1IdsK06m-QzRvRrkpmpCvGe7ITh6UPl13wlflxNrSc54", tab: "Health&Glow",         name: "Health&Glow (S3)",         hrow: 2 },
+  { id: "1IdsK06m-QzRvRrkpmpCvGe7ITh6UPl13wlflxNrSc54", tab: "Avenue Ecommerce",    name: "Avenue Ecommerce (S3)",    hrow: 2 },
+  { id: "1IdsK06m-QzRvRrkpmpCvGe7ITh6UPl13wlflxNrSc54", tab: "Flipkart Hyperlocal", name: "Flipkart Hyperlocal (S3)", hrow: 2 },
+  { id: "1IdsK06m-QzRvRrkpmpCvGe7ITh6UPl13wlflxNrSc54", tab: "General Trade",       name: "General Trade (S3)",       hrow: 2 },
+];
+
+// ═══════════════════════════════════════════════════════
 //  CONFIGURATION
 // ═══════════════════════════════════════════════════════
 const OAUTH_CLIENT_ID = "463035787922-tpie873ujm0b03cousnoan1np4t7jhvs.apps.googleusercontent.com";
 
 const COL_MAP = {
-  "dispatch wh":      "sourceWh",
-  "dispatch location":      "sourceWh",
-  "po no":            "poNo",
-  "shipment id":      "poNo",
-  "po number":        "poNo",
-  "order reference":  "poNo",
-  "portal":           "portal",
-  "po date":          "poDate",
-  "po creation date": "poDate",
-  "location":         "location",
-  "store name":       "location",
-  "warehouse":        "location",
-  "destination warehouse":         "location",
-  "destination wh":   "location",
-  "billing warehouse":   "location",
-  "status":           "status",
-  "wh remarks":       "status",
-  "dispatched date":  "dispatchedDate",
-  "remarks":          "remarks",
-  "pick up date":     "apptDate",
-  "appointment date": "apptDate",
-  "appointment time": "apptTime",
-  "appointment id":   "apptId",
-  "expiry date":      "expiryDate",
-  "delivery date":    "deliveryDate",
-  "courier":          "courier",
-  "awb no":           "awbNo",
-  "awb no.":           "awbNo",
-  "awb":              "awbNo",
-  "po qty":           "poQty",
-  "inv qty":          "invQty",
-  "invoice qty":      "invQty",
-  "disp qty":         "invQty",
-  "dispatch qty":      "invQty",
-  "boxes":            "boxes",
-  "fill rate":        "fillRate",
-  "po value":         "poValue",
-  "invoice value":    "invoiceValue",
-  "invoice no":       "invoiceNo",
-  "inward date":      "inwardDate",
+  "dispatch wh":           "sourceWh",
+  "dispatch location":     "sourceWh",
+  "po no":                 "poNo",
+  "shipment id":           "poNo",
+  "po number":             "poNo",
+  "order reference":       "poNo",
+  "portal":                "portal",
+  "po date":               "poDate",
+  "po creation date":      "poDate",
+  "location":              "location",
+  "store name":            "location",
+  "warehouse":             "location",
+  "destination warehouse": "location",
+  "destination wh":        "location",
+  "billing warehouse":     "location",
+  "status":                "status",
+  "wh remarks":            "status",
+  "dispatched date":       "dispatchedDate",
+  "remarks":               "remarks",
+  "pick up date":          "apptDate",
+  "appointment date":      "apptDate",
+  "appointment time":      "apptTime",
+  "appointment id":        "apptId",
+  "expiry date":           "expiryDate",
+  "delivery date":         "deliveryDate",
+  "courier":               "courier",
+  "awb no":                "awbNo",
+  "awb no.":               "awbNo",
+  "awb":                   "awbNo",
+  "po qty":                "poQty",
+  "inv qty":               "invQty",
+  "invoice qty":           "invQty",
+  "disp qty":              "invQty",
+  "dispatch qty":          "invQty",
+  "boxes":                 "boxes",
+  "fill rate":             "fillRate",
+  "po value":              "poValue",
+  "invoice value":         "invoiceValue",
+  "invoice no":            "invoiceNo",
+  "inward date":           "inwardDate",
 };
 
 // ═══════════════════════════════════════════════════════
 //  STATUS NORMALISATION
-//  Called once per row after sheet data is parsed.
-//  The raw value from the sheet → canonical display value.
 // ═══════════════════════════════════════════════════════
 function normaliseStatus(raw) {
   const s = (raw || "").trim().toLowerCase();
-
-  // Blank → Conversion Pending
-  // Blank → empty
-if (!s) return "";
-
-  // "sent for approval" → Approval Pending
+  if (!s) return "";
   if (s === "sent for approval") return "Approval Pending";
-
-  // "so pending" / "s.o. pending" / "so. pending" → Process Pending
   if (s === "so pending" || s === "s.o. pending" || s === "so. pending") return "Process Pending";
-
-  // Plain "pending" (no qualifier) → Conversion Pending
   if (s === "pending") return "Conversion Pending";
-
-  // Already-canonical values — return with proper casing
   const canonical = {
     "conversion pending": "Conversion Pending",
     "approval pending":   "Approval Pending",
@@ -445,8 +447,6 @@ if (!s) return "";
     "rto":                "RTO",
   };
   if (canonical[s]) return canonical[s];
-
-  // Fallback: return original with first-letter capitalisation
   return raw.trim().replace(/\b\w/g, c => c.toUpperCase());
 }
 
@@ -461,7 +461,6 @@ const PAGE_SIZE = 100;
 let sortCol = "poDate";
 let sortDir = -1;
 
-// Multi-select state: maps filter key → Set of selected values (empty = all)
 const msState = { channel: new Set(), status: new Set(), wh: new Set() };
 const STATUS_OPTIONS = [
   "Conversion Pending","Approval Pending","Process Pending",
@@ -472,10 +471,9 @@ const STATUS_OPTIONS = [
 //  AUTH
 // ═══════════════════════════════════════════════════════
 function handleCredential(response) {
-  const clientId = OAUTH_CLIENT_ID;
   const scope = "https://www.googleapis.com/auth/spreadsheets.readonly";
   const redirectUri = window.location.href.split("?")[0].split("#")[0];
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?response_type=token&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}`;
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?response_type=token&client_id=${OAUTH_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}`;
   window.location.href = authUrl;
 }
 
@@ -485,21 +483,11 @@ function checkOAuthCallback() {
     const params = new URLSearchParams(hash.replace("#", "?").slice(1));
     accessToken = params.get("access_token");
     window.history.replaceState({}, "", window.location.pathname);
-    showAppOrSetup();
+    showApp();
+    loadAllSheets(SHEETS_CONFIG);
     return true;
   }
   return false;
-}
-
-function showAppOrSetup() {
-  document.getElementById("auth-screen").style.display = "none";
-  const config = loadConfig();
-  if (!config || config.sheets.length === 0) {
-    showSetup();
-  } else {
-    showApp();
-    loadAllSheets(config.sheets);
-  }
 }
 
 function signOut() {
@@ -508,81 +496,10 @@ function signOut() {
 }
 
 // ═══════════════════════════════════════════════════════
-//  SETUP
-// ═══════════════════════════════════════════════════════
-function showSetup() {
-  document.getElementById("setup-screen").style.display = "block";
-  document.getElementById("app").style.display = "none";
-  const config = loadConfig();
-  const existing = config ? config.sheets : [{ id: "", tab: "", name: "" }];
-  existing.forEach(s => addSheetEntry(s.id, s.tab, s.name));
-}
-
-function openSetup() {
-  document.getElementById("sheet-entries").innerHTML = "";
-  showSetup();
-}
-
-let entryCount = 0;
-function addSheetEntry(id = "", tab = "", name = "") {
-  entryCount++;
-  const d = document.createElement("div");
-  d.className = "sheet-entry";
-  d.id = "entry-" + entryCount;
-  d.innerHTML = `
-    <div style="grid-column: 1/-1; display:flex; justify-content:space-between; align-items:center;">
-      <span style="font-size:12px; font-weight:500; color:var(--muted);">Sheet ${entryCount}</span>
-      <button class="btn-remove" onclick="this.closest('.sheet-entry').remove()">×</button>
-    </div>
-    <div>
-      <label>Sheet ID (from URL)</label>
-      <input type="text" class="se-id" value="${id}" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms">
-    </div>
-    <div>
-      <label>Tab name (exact)</label>
-      <input type="text" class="se-tab" value="${tab}" placeholder="Blinkit">
-    </div>
-    <div style="grid-column: 1/-1;">
-      <label>Friendly name (optional)</label>
-      <input type="text" class="se-name" value="${name}" placeholder="e.g. Blinkit — Quick Com">
-    </div>
-  `;
-  document.getElementById("sheet-entries").appendChild(d);
-}
-
-function saveAndLoad() {
-  const entries = document.querySelectorAll(".sheet-entry");
-  const sheets = [];
-  let valid = true;
-  entries.forEach(e => {
-    const id = e.querySelector(".se-id").value.trim();
-    const tab = e.querySelector(".se-tab").value.trim();
-    const name = e.querySelector(".se-name").value.trim();
-    if (id && tab) sheets.push({ id, tab, name: name || tab });
-    else if (id || tab) valid = false;
-  });
-  if (!valid) { showSetupError("Please fill in both Sheet ID and Tab name for each row (or remove incomplete rows)."); return; }
-  if (sheets.length === 0) { showSetupError("Add at least one sheet."); return; }
-  saveConfig({ sheets });
-  document.getElementById("setup-error").style.display = "none";
-  showApp();
-  loadAllSheets(sheets);
-}
-
-function showSetupError(msg) {
-  const el = document.getElementById("setup-error");
-  el.textContent = msg;
-  el.style.display = "block";
-}
-
-function saveConfig(c) { try { localStorage.setItem("po_tracker_config", JSON.stringify(c)); } catch(e) {} }
-function loadConfig() { try { const s = localStorage.getItem("po_tracker_config"); return s ? JSON.parse(s) : null; } catch(e) { return null; } }
-
-// ═══════════════════════════════════════════════════════
 //  DATA LOADING
 // ═══════════════════════════════════════════════════════
 function showApp() {
-  document.getElementById("setup-screen").style.display = "none";
+  document.getElementById("auth-screen").style.display = "none";
   document.getElementById("app").style.display = "block";
 }
 
@@ -597,14 +514,13 @@ async function loadAllSheets(sheets) {
   });
 
   if (allRows.length === 0) {
-    showError("No data loaded. Check your Sheet IDs and tab names — they must match exactly.");
+    showError("No data loaded. Check that your Google account has access to the sheets.");
     showLoading(false);
     return;
   }
 
   populateFilters();
   applyFilters();
-  // Mark the default sort column visually
   const defaultTh = document.querySelector('th[data-col="poDate"]');
   if (defaultTh) {
     defaultTh.classList.add("sorted");
@@ -614,7 +530,12 @@ async function loadAllSheets(sheets) {
   updateStats();
   showLoading(false);
   document.getElementById("last-refresh").textContent = "Updated " + new Date().toLocaleTimeString();
-  document.getElementById("sheet-tabs").textContent = sheets.map(s => s.name).join(" · ");
+
+  // Show loaded sheet names grouped nicely
+  const loadedNames = results
+    .map((r, i) => r.status === "fulfilled" && r.value.length > 0 ? sheets[i].name : null)
+    .filter(Boolean);
+  document.getElementById("sheet-tabs").textContent = loadedNames.join(" · ");
 }
 
 async function fetchSheet(sheet) {
@@ -626,10 +547,14 @@ async function fetchSheet(sheet) {
   }
   const data = await res.json();
   const rows = data.values || [];
-  if (rows.length < 2) return [];
-  const headers = rows[0].map(h => (h || "").toLowerCase().trim());
-  return rows.slice(1).map((row, i) => {
-    const obj = { _channel: sheet.name, _rowIndex: i + 2 };
+
+  // hrow is 1-based; convert to 0-based index
+  const hrowIdx = (sheet.hrow || 1) - 1;
+  if (rows.length <= hrowIdx) return [];
+
+  const headers = rows[hrowIdx].map(h => (h || "").toLowerCase().trim());
+  return rows.slice(hrowIdx + 1).map((row, i) => {
+    const obj = { _channel: sheet.name, _rowIndex: hrowIdx + i + 2 };
     headers.forEach((h, ci) => {
       const key = COL_MAP[h] || h;
       obj[key] = row[ci] || "";
@@ -638,26 +563,19 @@ async function fetchSheet(sheet) {
       const pq = parseFloat(obj.poQty), iq = parseFloat(obj.invQty);
       if (pq > 0) obj.fillRate = ((iq / pq) * 100).toFixed(1) + "%";
     }
-    // Store dates internally as YYYY-MM-DD for sorting/comparison
     obj.poDate         = normaliseDate(obj.poDate);
     obj.dispatchedDate = normaliseDate(obj.dispatchedDate);
     obj.expiryDate     = normaliseDate(obj.expiryDate);
     obj.deliveryDate   = normaliseDate(obj.deliveryDate);
     obj.apptDate       = normaliseDate(obj.apptDate);
     obj.inwardDate     = normaliseDate(obj.inwardDate);
-    obj.channel = sheet.name;
-
-    // Normalise status
-    obj.status = normaliseStatus(obj.status);
-
+    obj.channel        = sheet.name;
+    obj.status         = normaliseStatus(obj.status);
     return obj;
   }).filter(r => r.poNo || r.channel);
 }
 
-function refreshData() {
-  const config = loadConfig();
-  if (config) loadAllSheets(config.sheets);
-}
+function refreshData() { loadAllSheets(SHEETS_CONFIG); }
 
 // ═══════════════════════════════════════════════════════
 //  MULTI-SELECT DROPDOWN
@@ -668,9 +586,9 @@ function buildMsOptions(key, values) {
     ? `<div class="ms-empty">No options</div>`
     : values.map(v => `
       <div class="ms-option">
-        <input type="checkbox" id="ms-${key}-${btoa(v)}" value="${esc(v)}"
+        <input type="checkbox" id="ms-${key}-${btoa(encodeURIComponent(v))}" value="${esc(v)}"
           onchange="onMsChange('${key}', this.value, this.checked)">
-        <label for="ms-${key}-${btoa(v)}">${esc(v)}</label>
+        <label for="ms-${key}-${btoa(encodeURIComponent(v))}">${esc(v)}</label>
       </div>`).join("");
   updateMsTrigger(key);
 }
@@ -678,14 +596,12 @@ function buildMsOptions(key, values) {
 function filterMsOptions(key, query) {
   const q = query.toLowerCase();
   document.querySelectorAll(`#ms-${key}-opts .ms-option`).forEach(el => {
-    const label = el.querySelector("label").textContent.toLowerCase();
-    el.style.display = label.includes(q) ? "" : "none";
+    el.style.display = el.querySelector("label").textContent.toLowerCase().includes(q) ? "" : "none";
   });
 }
 
 function onMsChange(key, value, checked) {
-  if (checked) msState[key].add(value);
-  else msState[key].delete(value);
+  if (checked) msState[key].add(value); else msState[key].delete(value);
   updateMsTrigger(key);
   applyFilters();
 }
@@ -697,9 +613,7 @@ function selectAllMs(key) {
   applyFilters();
 }
 
-function clearMs(key) {
-  selectAllMs(key);
-}
+function clearMs(key) { selectAllMs(key); }
 
 function updateMsTrigger(key) {
   const sel = msState[key];
@@ -721,16 +635,11 @@ function toggleMs(key) {
   const dd = document.getElementById(`ms-${key}-dd`);
   const trigger = document.getElementById(`ms-${key}-trigger`);
   const isOpen = dd.classList.contains("open");
-  // Close all first
   document.querySelectorAll(".ms-dropdown").forEach(d => d.classList.remove("open"));
   document.querySelectorAll(".ms-trigger").forEach(t => t.classList.remove("open"));
-  if (!isOpen) {
-    dd.classList.add("open");
-    trigger.classList.add("open");
-  }
+  if (!isOpen) { dd.classList.add("open"); trigger.classList.add("open"); }
 }
 
-// Close dropdowns when clicking outside
 document.addEventListener("click", e => {
   if (!e.target.closest(".ms-wrap")) {
     document.querySelectorAll(".ms-dropdown").forEach(d => d.classList.remove("open"));
@@ -743,19 +652,18 @@ document.addEventListener("click", e => {
 // ═══════════════════════════════════════════════════════
 function populateFilters() {
   const channels = [...new Set(allRows.map(r => r.channel).filter(Boolean))].sort();
-  const whs = [...new Set(allRows.map(r => r.sourceWh).filter(Boolean))].sort();
-
+  const whs      = [...new Set(allRows.map(r => r.sourceWh).filter(Boolean))].sort();
   buildMsOptions("channel", channels);
   buildMsOptions("status", STATUS_OPTIONS);
   buildMsOptions("wh", whs);
 }
 
 function applyFilters() {
-  const search    = document.getElementById("f-search").value.toLowerCase();
-  const dateFrom  = document.getElementById("f-date-from").value;
-  const dateTo    = document.getElementById("f-date-to").value;
-  const apptFrom  = document.getElementById("f-appt-from").value;
-  const apptTo    = document.getElementById("f-appt-to").value;
+  const search   = document.getElementById("f-search").value.toLowerCase();
+  const dateFrom = document.getElementById("f-date-from").value;
+  const dateTo   = document.getElementById("f-date-to").value;
+  const apptFrom = document.getElementById("f-appt-from").value;
+  const apptTo   = document.getElementById("f-appt-to").value;
 
   const selChannels = msState.channel;
   const selStatuses = new Set([...msState.status].map(s => s.toLowerCase()));
@@ -813,19 +721,14 @@ const DATE_COLS = new Set(["poDate","dispatchedDate","expiryDate","deliveryDate"
 
 function sortRows() {
   filteredRows.sort((a, b) => {
-    let av = a[sortCol] || "";
-    let bv = b[sortCol] || "";
-
+    let av = a[sortCol] || "", bv = b[sortCol] || "";
     if (DATE_COLS.has(sortCol)) {
       if (!av && !bv) return 0;
       if (!av) return 1;
       if (!bv) return -1;
       return sortDir * av.localeCompare(bv);
     }
-
-    if (!isNaN(parseFloat(av)) && !isNaN(parseFloat(bv))) {
-      return sortDir * (parseFloat(av) - parseFloat(bv));
-    }
+    if (!isNaN(parseFloat(av)) && !isNaN(parseFloat(bv))) return sortDir * (parseFloat(av) - parseFloat(bv));
     return sortDir * av.localeCompare(bv);
   });
 }
@@ -848,7 +751,6 @@ function badgeClass(status) {
   if (s === "dispatched")         return "badge-dispatched";
   if (s === "delivered")          return "badge-delivered";
   if (s === "hold" || s === "rto") return "badge-hold";
-  // Generic "pending" fallback (shouldn't appear after normalisation but just in case)
   if (s === "pending")            return "badge-pending";
   return "badge-default";
 }
@@ -873,9 +775,9 @@ function renderTable() {
 
   document.getElementById("row-count").textContent = filteredRows.length.toLocaleString() + " rows";
   tbody.innerHTML = page.map((r, i) => {
-    const over  = isOverdue(r);
-    const fr    = r.fillRate ? (r.fillRate + (r.fillRate.includes("%") ? "" : "%")) : "—";
-    const frNum = parseFloat(r.fillRate) || 0;
+    const over   = isOverdue(r);
+    const fr     = r.fillRate ? (r.fillRate + (r.fillRate.includes("%") ? "" : "%")) : "—";
+    const frNum  = parseFloat(r.fillRate) || 0;
     const frColor = frNum >= 95 ? "color:var(--green)" : frNum >= 80 ? "color:var(--amber)" : frNum > 0 ? "color:var(--red)" : "";
     return `<tr class="${over ? "overdue" : ""}" onclick="showDetail(${start + i})" style="cursor:pointer;">
       <td><span class="channel-pill">${esc(r.channel)}</span></td>
@@ -915,8 +817,7 @@ function renderPagination() {
 }
 
 function goPage(p) {
-  const pages = Math.ceil(filteredRows.length / PAGE_SIZE);
-  currentPage = Math.max(1, Math.min(pages, p));
+  currentPage = Math.max(1, Math.min(Math.ceil(filteredRows.length / PAGE_SIZE), p));
   renderTable();
 }
 
@@ -926,17 +827,11 @@ function goPage(p) {
 function updateStats() {
   const rows       = filteredRows;
   const total      = rows.length;
-  const dispatched = rows.filter(r => {
-    const s = (r.status || "").toLowerCase();
-    return s === "dispatched" || s === "delivered";
-  }).length;
-  const pending = rows.filter(r => {
-    const s = (r.status || "").toLowerCase();
-    return s !== "dispatched" && s !== "delivered";
-  }).length;
-  const overdue = rows.filter(isOverdue).length;
-  const fills   = rows.map(r => parseFloat(r.fillRate)).filter(n => !isNaN(n) && n > 0);
-  const avgFill = fills.length ? (fills.reduce((a, b) => a + b, 0) / fills.length).toFixed(1) + "%" : "—";
+  const dispatched = rows.filter(r => { const s = (r.status || "").toLowerCase(); return s === "dispatched" || s === "delivered"; }).length;
+  const pending    = rows.filter(r => { const s = (r.status || "").toLowerCase(); return s !== "dispatched" && s !== "delivered"; }).length;
+  const overdue    = rows.filter(isOverdue).length;
+  const fills      = rows.map(r => parseFloat(r.fillRate)).filter(n => !isNaN(n) && n > 0);
+  const avgFill    = fills.length ? (fills.reduce((a, b) => a + b, 0) / fills.length).toFixed(1) + "%" : "—";
   document.getElementById("s-total").textContent      = total.toLocaleString();
   document.getElementById("s-dispatched").textContent = dispatched.toLocaleString();
   document.getElementById("s-pending").textContent    = pending.toLocaleString();
@@ -952,29 +847,29 @@ function showDetail(idx) {
   if (!r) return;
   document.getElementById("modal-po-no").textContent = r.poNo || "PO Details";
   const fields = [
-    ["Channel",        r.channel],
-    ["Source/WH",      r.sourceWh],
-    ["Portal",         r.portal],
-    ["PO Date",        displayDate(r.poDate)],
-    ["Location/WH",    r.location],
-    ["Status",         r.status],
-    ["Dispatched Date",displayDate(r.dispatchedDate)],
-    ["Expiry Date",    displayDate(r.expiryDate)],
-    ["Delivery Date",  displayDate(r.deliveryDate)],
-    ["Inward Date",    displayDate(r.inwardDate)],
-    ["AWB No",         r.awbNo],
-    ["Courier",        r.courier],
-    ["PO Qty",         r.poQty],
-    ["Inv Qty",        r.invQty],
-    ["Boxes",          r.boxes],
-    ["Fill Rate",      r.fillRate],
-    ["PO Value",       r.poValue],
-    ["Invoice Value",  r.invoiceValue],
-    ["Invoice No",     r.invoiceNo],
-    ["Appt Date",      displayDate(r.apptDate)],
-    ["Appt Time",      r.apptTime],
-    ["Appt ID",        r.apptId],
-    ["Remarks",        r.remarks],
+    ["Channel",         r.channel],
+    ["Source/WH",       r.sourceWh],
+    ["Portal",          r.portal],
+    ["PO Date",         displayDate(r.poDate)],
+    ["Location/WH",     r.location],
+    ["Status",          r.status],
+    ["Dispatched Date", displayDate(r.dispatchedDate)],
+    ["Expiry Date",     displayDate(r.expiryDate)],
+    ["Delivery Date",   displayDate(r.deliveryDate)],
+    ["Inward Date",     displayDate(r.inwardDate)],
+    ["AWB No",          r.awbNo],
+    ["Courier",         r.courier],
+    ["PO Qty",          r.poQty],
+    ["Inv Qty",         r.invQty],
+    ["Boxes",           r.boxes],
+    ["Fill Rate",       r.fillRate],
+    ["PO Value",        r.poValue],
+    ["Invoice Value",   r.invoiceValue],
+    ["Invoice No",      r.invoiceNo],
+    ["Appt Date",       displayDate(r.apptDate)],
+    ["Appt Time",       r.apptTime],
+    ["Appt ID",         r.apptId],
+    ["Remarks",         r.remarks],
   ];
   document.getElementById("modal-body").innerHTML = fields
     .filter(([, v]) => v)
@@ -984,9 +879,8 @@ function showDetail(idx) {
 }
 
 function closeModal(e) {
-  if (e.target === document.getElementById("detail-modal")) {
+  if (e.target === document.getElementById("detail-modal"))
     document.getElementById("detail-modal").classList.remove("open");
-  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -994,13 +888,12 @@ function closeModal(e) {
 // ═══════════════════════════════════════════════════════
 function exportCSV() {
   const cols = ["channel","sourceWh","poNo","portal","poDate","location","status","dispatchedDate","expiryDate","deliveryDate","inwardDate","awbNo","courier","poQty","invQty","boxes","fillRate","poValue","invoiceNo","apptDate","apptTime","apptId","remarks"];
-  const header = cols.join(",");
   const dateFields = new Set(["poDate","dispatchedDate","expiryDate","deliveryDate","inwardDate","apptDate"]);
   const rows = filteredRows.map(r => cols.map(c => {
     const v = dateFields.has(c) ? displayDate(r[c] || "") : (r[c] || "");
     return `"${v.replace(/"/g, '""')}"`;
   }).join(","));
-  const csv  = [header, ...rows].join("\n");
+  const csv  = [cols.join(","), ...rows].join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
   const a    = document.createElement("a");
   a.href     = URL.createObjectURL(blob);
@@ -1009,33 +902,23 @@ function exportCSV() {
 }
 
 // ═══════════════════════════════════════════════════════
-//  UTILS — date normalisation
+//  DATE NORMALISATION
 // ═══════════════════════════════════════════════════════
 function normaliseDate(d) {
   if (!d || typeof d !== "string") return "";
   d = d.trim();
   if (!d) return "";
-
   if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
-
   function iso(day, mon, yr) {
     const y = yr.length === 2 ? (parseInt(yr) > 50 ? "19" + yr : "20" + yr) : yr;
     return `${y}-${mon.padStart(2,"0")}-${day.padStart(2,"0")}`;
   }
-
   let m;
-  m = d.match(/^(\d{1,2})-(\d{1,2})-(\d{2,4})$/);
-  if (m) return iso(m[1], m[2], m[3]);
-
-  m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-  if (m) return iso(m[1], m[2], m[3]);
-
-  m = d.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
-  if (m) return iso(m[1], m[2], m[3]);
-
+  m = d.match(/^(\d{1,2})-(\d{1,2})-(\d{2,4})$/);  if (m) return iso(m[1], m[2], m[3]);
+  m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/); if (m) return iso(m[1], m[2], m[3]);
+  m = d.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/); if (m) return iso(m[1], m[2], m[3]);
   const p = new Date(d);
   if (!isNaN(p)) return p.toISOString().slice(0, 10);
-
   return d;
 }
 
@@ -1046,9 +929,7 @@ function clearError()    { document.getElementById("app-error").style.display = 
 // ═══════════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════════
-if (!checkOAuthCallback()) {
-  // Google Sign-In button renders automatically via GSI script
-}
+checkOAuthCallback();
 </script>
 </body>
 </html>
